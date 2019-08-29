@@ -1,7 +1,7 @@
 MEL (Michael's Epic Localisation)
 ====================
 
-Incorporates fusion of GPS and lidar data by modifying the AMCL package from the ROS Navigation Stack and running all data in an Extended Kalman Filter from the robot_localisation package.
+Incorporates fusion of GPS and lidar data by modifying the AMCL package from the ROS Navigation Stack.
 
 
 

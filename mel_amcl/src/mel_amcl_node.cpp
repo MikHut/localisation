@@ -35,6 +35,7 @@
 #include "mel_amcl/map/map.h"
 #include "mel_amcl/pf/pf.h"
 #include "mel_amcl/sensors/mel_amcl_odom.h"
+#include "mel_amcl/sensors/mel_amcl_pose.h"
 #include "mel_amcl/sensors/mel_amcl_laser.h"
 #include "portable_utils.hpp"
 
@@ -208,6 +209,7 @@ private:
 
   // GPS related variables
   pf_vector_t last_received_gps_pose;
+  pf_vector_t last_received_gps_covariance;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
@@ -216,6 +218,7 @@ private:
   // This will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   bool use_gps_odom;
   bool gps_received = false;
+  double gps_mask_std;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 4;
   int degraded_amcl_localisation_counter = 0;
@@ -249,6 +252,7 @@ private:
   bool m_force_update; // used to temporarily let amcl update samples even when no motion occurs...
 
   AMCLOdom *odom_;
+  AMCLPose *pose_;
   AMCLLaser *laser_;
 
   ros::Duration cloud_pub_interval;
@@ -370,6 +374,7 @@ AmclNode::AmclNode() :
         pf_(NULL),
         resample_count_(0),
         odom_(NULL),
+        pose_(NULL),
         laser_(NULL),
 	      private_nh_("~"),
         initial_pose_hyp_(NULL),
@@ -531,6 +536,8 @@ AmclNode::AmclNode() :
   // for navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
   // this will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   private_nh_.param("use_gps_odom", use_gps_odom, false);
+  private_nh_.param("gps_mask_std", gps_mask_std, 0.1);
+
 
 
 
@@ -579,12 +586,20 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
 
   // Put GPS pose data into format for AMCLLaser::LikelihoodField so we can compute likelihood
   pf_vector_t gps_pose = pf_vector_zero();
+  pf_vector_t gps_covariance = pf_vector_zero();
+
   gps_pose.v[0] = msg.pose.pose.position.x;
   gps_pose.v[1] = msg.pose.pose.position.y;
   gps_pose.v[2] = tf2::getYaw(msg.pose.pose.orientation);
 
+  gps_covariance.v[0] = msg.pose.covariance[0];
+  gps_covariance.v[1] = msg.pose.covariance[7];
+  gps_covariance.v[2] = msg.pose.covariance[35];
+
   last_gps_msg_received_ts_ = msg.header.stamp; //ros::Time::now();
   last_received_gps_pose = gps_pose;
+  last_received_gps_covariance = gps_covariance;
+
   last_received_gps_msg = msg;
 
   if (use_gps_without_scan == true || !first_map_received_)
@@ -706,6 +721,10 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
   odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  //Pose
+  delete pose_;
+  pose_ = new AMCLPose();
+  ROS_ASSERT(pose_);
   // Laser
   delete laser_;
   laser_ = new AMCLLaser(max_beams_, map_);
@@ -1032,6 +1051,10 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
   odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  //Pose
+  delete pose_;
+  pose_ = new AMCLPose();
+  ROS_ASSERT(pose_);
   // Laser
   delete laser_;
   laser_ = new AMCLLaser(max_beams_, map_);
@@ -1074,6 +1097,8 @@ AmclNode::freeMapDependentMemory()
   }
   delete odom_;
   odom_ = NULL;
+  delete pose_;
+  pose_ = NULL;
   delete laser_;
   laser_ = NULL;
 }
@@ -1223,6 +1248,7 @@ void
 AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 {
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
+  AMCLPoseData pdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);
   last_laser_received_ts_ = ros::Time::now();
   if( map_ == NULL ) {
@@ -1349,7 +1375,35 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   // If the robot has moved, update the filter
   if(lasers_update_[laser_index])
   {
-    
+
+    if ((use_gps || use_gps_odom) && gps_received)
+    {
+      
+      
+      pdata.pose = last_received_gps_pose;
+
+      pdata.pose_covariance = last_received_gps_covariance;
+
+      ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
+      ROS_INFO("GPS age: %f seconds. Variance: x= %f, y= %f meters",
+             d.toSec(), pdata.pose_covariance.v[0], pdata.pose_covariance.v[1]);
+      if ( d < ros::Duration(0.2) )
+      {
+        if ( sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std )
+        {
+          pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata);
+        }
+        else
+        {
+        ROS_WARN("GPS variance too high (x=%f, y=%f)), skipped gps update.", pdata.pose_covariance.v[0], pdata.pose_covariance.v[1]);
+        }
+      }
+      else
+      {
+        ROS_WARN("GPS data too old to fuse, skipped gps update.");
+      }  
+    }
+
     ldata.sensor = lasers_[laser_index];
     ldata.range_count = laser_scan->ranges.size();
 
@@ -1448,7 +1502,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       }
       particlecloud_pub_.publish(cloud_msg);
     }
+
+
   }
+
 
   if(resampled || force_publication)
   {
@@ -1536,6 +1593,17 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         // Localisation quality monitor (AMCL vs GPS)
         // Compare likelihood between gps and amcl positions, reinitialise AMCL if its weight is low
         // degraded_amcl_localisation_count_max times in a row
+
+        double pose_discrepancy = sqrt( pow(last_received_gps_pose.v[0] - hyps[max_weight_hyp].pf_pose_mean.v[0],2) + pow(last_received_gps_pose.v[1] - hyps[max_weight_hyp].pf_pose_mean.v[1],2) );
+
+        if (pose_discrepancy > 3 &&  sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std && weight_gps_from_scan > 2)
+        {
+              ROS_WARN("Resetting AMCL pose due to pose discepancy");
+              // reinitialise particle filter with the gps data
+              handleInitialPoseMessage(last_received_gps_msg);
+              degraded_amcl_localisation_counter = 0;
+        }
+
         if (weight_gps_from_scan > weight_amcl_from_scan)
         {
           ROS_INFO("Using GPS pos");
@@ -1548,7 +1616,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
             use_filtered_amcl_pose_ = false;
             if (degraded_amcl_localisation_counter >= degraded_amcl_localisation_count_max)
             {
-              ROS_INFO("Resetting AMCL pose");
+              ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
 
               // reinitialise particle filter with the gps data
               handleInitialPoseMessage(last_received_gps_msg);
@@ -1564,12 +1632,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           use_filtered_amcl_pose_ = true;
         }
 
-        // Just to test what is the time difference between gps and laser scan data
-        // NOTE: it was less than 1/10 of a second.
-        /*
-      ros::Duration time_diff = gps_msg.header.stamp - laser_scan->header.stamp;
-      ROS_INFO("Time difference between gps and scan is: %f", time_diff.toSec());
-      */
       }
       else
       {

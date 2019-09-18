@@ -4,10 +4,10 @@
   
   <arg name="site_name" default="riseholme" />
 
+  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
 
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
-    <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
     <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
     <remap from="imu/data" to="yaw"/> 
     <remap from="odometry/filtered" to="odometry/gps"/>

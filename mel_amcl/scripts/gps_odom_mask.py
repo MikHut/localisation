@@ -18,7 +18,7 @@ class GpsMask:
     
     def __init__(self):
 
-        self.gps_error_mask = rospy.get_param('~gps_error_mask', 0.05)
+        self.gps_error_mask = rospy.get_param('~gps_error_mask', 0.01)
 
         
         self.gps_error_x = 0

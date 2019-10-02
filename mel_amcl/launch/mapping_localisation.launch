@@ -3,11 +3,11 @@
 <launch>
   
   <arg name="site_name" default="riseholme" />
+  <arg name="gps_error_mask" default="0.01" />
 
-
+  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
-    <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
     <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
     <remap from="imu/data" to="yaw"/> 
     <remap from="odometry/filtered" to="odometry/gps"/>
@@ -19,6 +19,7 @@
   <!-- GPS mask for high error data -->
   <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true">
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+    <param name="gps_error_mask" value="$(arg gps_error_mask)"/>
   </node>
 
   <!-- load parameters for eKFs: odom, map and separate gps -->

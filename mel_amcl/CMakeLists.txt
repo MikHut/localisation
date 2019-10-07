@@ -178,4 +178,4 @@ install(DIRECTORY examples/
 # # some number of iterations of sensing and motion.
 # #
 # #  add_rostest(test/global_localization_stage.xml)
-endif()
+#endif()

@@ -604,6 +604,7 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
 
   if (use_gps_without_scan == true || !first_map_received_)
   {
+    // TODO: publish map tf using data from gps message - make sure this is undone if lasers come back
     filtered_gps_pose_pub_.publish(msg);
   }
 
@@ -1596,7 +1597,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         double pose_discrepancy = sqrt( pow(last_received_gps_pose.v[0] - hyps[max_weight_hyp].pf_pose_mean.v[0],2) + pow(last_received_gps_pose.v[1] - hyps[max_weight_hyp].pf_pose_mean.v[1],2) );
 
-        if (pose_discrepancy > 3 &&  sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std && weight_gps_from_scan > 2)
+        if (pose_discrepancy > 3 &&  sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std && weight_amcl_from_scan < 4)
         {
               ROS_WARN("Resetting AMCL pose due to pose discepancy");
               // reinitialise particle filter with the gps data

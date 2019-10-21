@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+
+<launch>
+
+  <param name="/use_sim_time" value="true"/>
+
+
+  <arg name="site_name" default="riseholme" />
+
+  <arg name="use_omni" default="true" />
+  <arg name="use_gps" default="true" />
+  <arg name="ekf_publish_tf" default="true" />
+
+  <arg name="map_file" default="$(find mel_amcl)/maps/clockhouse/clockhouse_west.yaml"/>
+
+  <!-- Play rosbag -->
+  <arg name="path" default="$(find mel_amcl)/bag_data/map_frame/clockhouse/" />
+  <!-- <arg name="path" default="/home/michael/Documents/Saga\ start/Localisation/" /> -->
+  <arg name="file_name" default="clockhouse_west.bag" />
+  <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg path)$(arg file_name)
+   -r 5 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan"/>
+  
+
+  <!-- Load map -->
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+ 
+
+  <!-- launch amcl but dont publish map->odom tf as this is handled by ekf_se_map -->
+  <include file="$(find mel_amcl)/launch/mel_amcl.launch">
+      <!-- <arg name="use_omni" value="$(arg use_omni)" /> -->
+      <arg name="use_gps" value="$(arg use_gps)" />
+      <arg name="use_gps_odom" value="$(arg use_gps)" />
+  </include>
+
+
+
+
+  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />
+
+  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" if="$(arg use_gps)">     
+      <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
+      <remap from="imu/data" to="yaw"/> 
+      <remap from="odometry/filtered" to="odometry/gps"/>
+      <remap from="gps/fix" to="gps/fix"/>
+      <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+  </node>
+
+
+
+  <!-- load parameters for eKFs: odom, and separate gps -->
+  <rosparam command="load" file="$(find mel_amcl)/config/rasberry_localisation.yaml" />
+
+  <!-- eKF for the odom frame -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_local" clear_params="true" if="$(arg ekf_publish_tf)">
+    <!-- <remap from="odometry/filtered" to="rl/odom"/> -->
+  </node>
+
+
+  <!-- eKF for the gps in map frame, to use output, set use_gps_odom arg in mel_amcl to true --> 
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps" clear_params="true" if="$(arg use_gps)">
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node> 
+
+
+  <!-- rviz -->
+  <node pkg="rviz" type="rviz" name="rviz"/>
+
+
+</launch>

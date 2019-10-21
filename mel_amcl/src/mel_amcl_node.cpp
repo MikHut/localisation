@@ -219,6 +219,8 @@ private:
   bool use_gps_odom;
   bool gps_received = false;
   double gps_mask_std;
+  double additional_pose_covariance;
+  double additional_yaw_covariance;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 4;
   int degraded_amcl_localisation_counter = 0;
@@ -634,7 +636,8 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   use_gps = config.use_gps;
   use_gps_odom = config.use_gps_odom;
   gps_mask_std = config.gps_mask_std;
-
+  additional_pose_covariance = config.additional_pose_covariance;
+  additional_yaw_covariance = config.additional_yaw_covariance;
 
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;

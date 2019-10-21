@@ -209,7 +209,7 @@ private:
 
   // GPS related variables
   pf_vector_t last_received_gps_pose;
-  pf_vector_t last_received_gps_covariance;
+  pf_vector_t last_received_gps_std;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
@@ -219,8 +219,8 @@ private:
   bool use_gps_odom;
   bool gps_received = false;
   double gps_mask_std;
-  double additional_pose_covariance;
-  double additional_yaw_covariance;
+  double additional_pose_std_;
+  double additional_yaw_std_;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 4;
   int degraded_amcl_localisation_counter = 0;
@@ -471,6 +471,16 @@ AmclNode::AmclNode() :
   private_nh_.param("recovery_alpha_fast", alpha_fast_, 0.1);
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
 
+  // For GPS
+  private_nh_.param("use_gps", use_gps, false);
+  // for navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
+  // this will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
+  private_nh_.param("use_gps_odom", use_gps_odom, false);
+  private_nh_.param("gps_mask_std", gps_mask_std, 0.12);
+  private_nh_.param("gps_additional_pose_std", additional_pose_std_, 0.6);
+  private_nh_.param("gps_additional_yaw_std", additional_yaw_std_, 0.4);
+
+
   // For diagnostics
   private_nh_.param("std_warn_level_x", std_warn_level_x_, 0.2);
   private_nh_.param("std_warn_level_y", std_warn_level_y_, 0.2);
@@ -534,11 +544,7 @@ AmclNode::AmclNode() :
   check_laser_timer_ = nh_.createTimer(laser_check_interval_, 
                                        boost::bind(&AmclNode::checkLaserReceived, this, _1));
 
-  private_nh_.param("use_gps", use_gps, false);
-  // for navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
-  // this will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
-  private_nh_.param("use_gps_odom", use_gps_odom, false);
-  private_nh_.param("gps_mask_std", gps_mask_std, 0.12);
+
 
 
 
@@ -588,19 +594,19 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
 
   // Put GPS pose data into format for AMCLLaser::LikelihoodField so we can compute likelihood
   pf_vector_t gps_pose = pf_vector_zero();
-  pf_vector_t gps_covariance = pf_vector_zero();
+  pf_vector_t gps_std = pf_vector_zero();
 
   gps_pose.v[0] = msg.pose.pose.position.x;
   gps_pose.v[1] = msg.pose.pose.position.y;
   gps_pose.v[2] = tf2::getYaw(msg.pose.pose.orientation);
 
-  gps_covariance.v[0] = msg.pose.covariance[0];
-  gps_covariance.v[1] = msg.pose.covariance[7];
-  gps_covariance.v[2] = msg.pose.covariance[35];
+  gps_std.v[0] = sqrt(msg.pose.covariance[0]);
+  gps_std.v[1] = sqrt(msg.pose.covariance[7]);
+  gps_std.v[2] = sqrt(msg.pose.covariance[35]);
 
   last_gps_msg_received_ts_ = msg.header.stamp; //ros::Time::now();
   last_received_gps_pose = gps_pose;
-  last_received_gps_covariance = gps_covariance;
+  last_received_gps_std = gps_std;
 
   last_received_gps_msg = msg;
 
@@ -636,8 +642,9 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   use_gps = config.use_gps;
   use_gps_odom = config.use_gps_odom;
   gps_mask_std = config.gps_mask_std;
-  additional_pose_covariance = config.additional_pose_covariance;
-  additional_yaw_covariance = config.additional_yaw_covariance;
+  additional_pose_std_ = config.gps_additional_pose_std;
+  additional_yaw_std_ = config.gps_additional_yaw_std;
+
 
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;
@@ -1064,7 +1071,7 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
   //Pose
   delete pose_;
   pose_ = new AMCLPose();
-  ROS_ASSERT(pose_);
+  ROS_ASSERT(pose_);  
   // Laser
   delete laser_;
   laser_ = new AMCLLaser(max_beams_, map_);
@@ -1392,20 +1399,23 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       
       pdata.pose = last_received_gps_pose;
 
-      pdata.pose_covariance = last_received_gps_covariance;
+      pdata.pose_std = last_received_gps_std;
+
+      pdata.additional_pose_std = additional_pose_std_;
+      pdata.additional_yaw_std = additional_yaw_std_;
 
       ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
-      ROS_INFO("GPS age: %f seconds. Variance: x= %f, y= %f meters",
-             d.toSec(), pdata.pose_covariance.v[0], pdata.pose_covariance.v[1]);
+      ROS_INFO("GPS age: %f seconds. Std: x= %f, y= %f meters",
+             d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);
       if ( d < ros::Duration(0.2) )
       {
-        if ( sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std )
+        if ( pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std )
         {
           pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata);
         }
         else
         {
-        ROS_WARN("GPS variance too high (x=%f, y=%f)), skipped gps update.", pdata.pose_covariance.v[0], pdata.pose_covariance.v[1]);
+        ROS_WARN("GPS standard deviation too high (x=%f, y=%f)), skipped gps update.", pdata.pose_std.v[0], pdata.pose_std.v[1]);
         }
       }
       else
@@ -1606,7 +1616,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         double pose_discrepancy = sqrt( pow(last_received_gps_pose.v[0] - hyps[max_weight_hyp].pf_pose_mean.v[0],2) + pow(last_received_gps_pose.v[1] - hyps[max_weight_hyp].pf_pose_mean.v[1],2) );
 
-        if (pose_discrepancy > 10 &&  sqrt(pdata.pose_covariance.v[0]) < gps_mask_std && sqrt(pdata.pose_covariance.v[1]) < gps_mask_std && weight_amcl_from_scan < 4)
+        if (pose_discrepancy > 10 &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
         {
               ROS_WARN("Resetting AMCL pose due to pose discepancy");
               // reinitialise particle filter with the gps data
@@ -1616,7 +1626,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         if (weight_gps_from_scan > weight_amcl_from_scan)
         {
-          ROS_INFO("Using GPS pos");
           // publish gps position on gps_transform/filtered topic
           filtered_gps_pose_pub_.publish(last_received_gps_msg);
 
@@ -1636,7 +1645,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         }
         else
         {
-          ROS_INFO("Using AMCL pos");
           degraded_amcl_localisation_counter = 0;
           // publish AMCL position on AMCL_pose/filtered topic
           use_filtered_amcl_pose_ = true;

@@ -630,6 +630,12 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
     config.restore_defaults = false;
   }
 
+  // GPS parameters
+  use_gps = config.use_gps;
+  use_gps_odom = config.use_gps_odom;
+  gps_mask_std = config.gps_mask_std;
+
+
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;
 

@@ -25,6 +25,14 @@ AMCLPose::AMCLPose() : AMCLSensor()
 }
 
 
+void AMCLPose::SetModel(double additional_pose_covariance,
+                        double additional_yaw_covariance)
+{
+  this->additional_pose_covariance = additional_pose_covariance;
+  this->additional_yaw_covariance = additional_yaw_covariance;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Apply the position sensor model
 bool AMCLPose::UpdateSensor(pf_t *pf, AMCLSensorData *data)

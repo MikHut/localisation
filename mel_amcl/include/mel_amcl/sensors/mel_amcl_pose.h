@@ -34,6 +34,9 @@ class AMCLPose : public AMCLSensor
   // Default constructor
   public: AMCLPose();
 
+  public: void SetModel(double additional_pose_covariance,
+                        double additional_yaw_covariance);
+                         
   // Update the filter based on the sensor model.  Returns true if the filter
   // has been updated.
   public: virtual bool UpdateSensor(pf_t *pf, AMCLSensorData *data);
@@ -45,6 +48,8 @@ class AMCLPose : public AMCLSensor
 
   // Current data timestamp
   private: double time;
+
+  private: double additional_pose_covariance, additional_yaw_covariance;
   
 };
 

@@ -7,11 +7,12 @@
   <arg name="use_omni" default="true" />
   <arg name="use_gps" default="true" />
   <arg name="ekf_publish_tf" default="true" />
+  <arg name="mapless" default="false" />
 
 
 
   <!-- launch amcl but dont publish map->odom tf as this is handled by ekf_se_map -->
-  <include file="$(find mel_amcl)/launch/mel_amcl.launch">
+  <include file="$(find mel_amcl)/launch/mel_amcl.launch" unless="$(arg mapless)">
       <!-- <arg name="use_omni" value="$(arg use_omni)" /> -->
       <arg name="use_gps" value="$(arg use_gps)" />
       <arg name="use_gps_odom" value="$(arg use_gps)" />
@@ -43,6 +44,12 @@
 
   <!-- eKF for the gps in map frame, to use output, set use_gps_odom arg in mel_amcl to true --> 
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps" clear_params="true" if="$(arg use_gps)">
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node> 
+
+
+    <!-- eKF for the gps and mapless navigation --> 
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps_mapless" clear_params="true" if="$(arg mapless)">
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node> 
 

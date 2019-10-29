@@ -206,7 +206,7 @@ ekf_gps_mapless:
   print_diagnostics: true
   debug: false
   debug_out_file: /home/michael/Documents/rasberry start/Localisation/rl_map_log.txt
-  publish_tf: false
+  publish_tf: true
 
   map_frame: map
   odom_frame: odom

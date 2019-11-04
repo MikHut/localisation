@@ -33,9 +33,9 @@
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">     
       <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
       <remap from="imu/data" to="yaw"/> 
-      <remap from="odometry/filtered" to="odometry/gps"/>
+      <remap from="odometry/filtered" to="odometry/gps/filtered"/>
       <remap from="gps/fix" to="gps/fix"/>
-      <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+      <remap from="odometry/gps" to="odometry/gps"/>
   </node>
 
 
@@ -51,7 +51,7 @@
 
   <!-- eKF for the gps in map frame, to use output, set use_gps_odom arg in mel_amcl to true --> 
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps" clear_params="true" unless="$(arg use_gps_only)">
-    <remap from="odometry/filtered" to="odometry/gps"/>
+    <remap from="odometry/filtered" to="odometry/gps/filtered"/>
   </node> 
 
   <!-- eKF for the gps in map frame which publishes the map frame tf instead of mel_amcl_node --> 

@@ -11,6 +11,9 @@
 
   <arg name="use_gps" default="true"/>
   <arg name="use_gps_odom" default="true"/>
+  <arg name="gps_mask_std" default="0.14" />
+  <arg name="gps_additional_pose_std" default="0.6" />
+  <arg name="gps_additional_yaw_std" default="0.4" />
 
   <arg name="use_omni" default="true" />
 
@@ -34,9 +37,9 @@
     <!-- <param name="gps_mask_std" value="5.0"/>
     <param name="gps_additional_pose_std" value="3.0"/>
     <param name="gps_additional_yaw_std" value="1.0"/> -->
-    <param name="gps_mask_std" value="0.14"/>
-    <param name="gps_additional_pose_std" value="0.6"/>
-    <param name="gps_additional_yaw_std" value="0.4"/>
+    <param name="gps_mask_std" value="$(arg gps_mask_std)"/>
+    <param name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)"/>
+    <param name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)"/>
 
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>

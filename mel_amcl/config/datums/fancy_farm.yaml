@@ -1,6 +1,7 @@
 
-datum_latitude: &datum_latitude 28.005690
-datum_longitude: &datum_longitude -82.072968
+datum_latitude: &datum_latitude 28.00530290
+datum_longitude: &datum_longitude -82.07428768
+
 
 mapviz_initialize_origin:
   local_xy_origins: 

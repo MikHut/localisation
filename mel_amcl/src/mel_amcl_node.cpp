@@ -214,6 +214,7 @@ private:
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
   bool use_gps;
+  bool use_ekf_yaw;
   // For navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
   // This will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   bool use_gps_odom;
@@ -472,7 +473,8 @@ AmclNode::AmclNode() :
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
 
   // For GPS
-  private_nh_.param("use_gps", use_gps, false);
+  private_nh_.param("use_gps", use_gps, true);
+  private_nh_.param("use_ekf_yaw", use_ekf_yaw, true);
   // for navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
   // this will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   private_nh_.param("use_gps_odom", use_gps_odom, false);
@@ -640,6 +642,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
 
   // GPS parameters
   use_gps = config.use_gps;
+  use_ekf_yaw = config.use_ekf_yaw;
   use_gps_odom = config.use_gps_odom;
   gps_mask_std = config.gps_mask_std;
   additional_pose_std_ = config.gps_additional_pose_std;
@@ -1403,7 +1406,8 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
       pdata.additional_pose_std = additional_pose_std_;
       pdata.additional_yaw_std = additional_yaw_std_;
-
+      pdata.use_ekf_yaw = use_ekf_yaw;
+      
       ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
       ROS_INFO("GPS age: %f seconds. Std: x= %f, y= %f meters",
              d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);

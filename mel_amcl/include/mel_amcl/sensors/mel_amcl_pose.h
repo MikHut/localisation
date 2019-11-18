@@ -26,6 +26,7 @@ class AMCLPoseData : public AMCLSensorData
     pf_vector_t pose_std;
     double additional_pose_std;
     double additional_yaw_std;
+    bool use_ekf_yaw;
 };
 
 

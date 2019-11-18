@@ -73,11 +73,20 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
 
     double x_p =  exp(-0.5 * (pow((pose.v[0] - data->pose.v[0]), 2) / (pow(data->pose_std.v[0],2)+pow(additional_pose_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[0],2)+pow(additional_pose_std,2)));
     double y_p =  exp(-0.5 * (pow((pose.v[1] - data->pose.v[1]), 2) / (pow(data->pose_std.v[1],2)+pow(additional_pose_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[1],2)+pow(additional_pose_std,2)));
-    double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)));
+    
+    if (data->use_ekf_yaw)
+    {
+      double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)));
+      p = x_p*y_p*yaw_p;
+    }
+    else
+    {
+      p = x_p*y_p;
+    }
     //double num = exp(-0.5 * (pow((pose.v[0] - data->pose.v[0]), 2) / (data->pose_covariance.v[0]+additional_pose_covariance) + pow((pose.v[1] - data->pose.v[1]), 2) / (data->pose_covariance.v[1]+additional_pose_covariance) + pow(angle_error, 2) / (data->pose_covariance.v[2]+additional_yaw_covariance) ));
     //double denom = sqrt(2 * M_PI * (data->pose_covariance.v[0]+additional_pose_covariance) * (data->pose_covariance.v[1]+additional_pose_covariance) * (data->pose_covariance.v[2]+additional_yaw_covariance));
     //p = num/denom;
-    p = x_p*y_p*yaw_p;
+   
     //assert(p <= 1.0);
     //assert(p >= 0.0);
     

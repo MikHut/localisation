@@ -35,19 +35,10 @@
     <!-- GPS parameters -->
     <param name="use_gps" value="$(arg use_gps)"/>
     <param name="use_gps_odom" value="$(arg use_gps_odom)"/>
-<<<<<<< HEAD
     <param name="gps_mask_std" value="$(arg gps_mask_std)" />
     <param name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)" />
     <param name="use_ekf_yaw" value="$(arg use_ekf_yaw)" />
     <param name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)" />
-=======
-    <!-- <param name="gps_mask_std" value="5.0"/>
-    <param name="gps_additional_pose_std" value="3.0"/>
-    <param name="gps_additional_yaw_std" value="1.0"/> -->
-    <param name="gps_mask_std" value="$(arg gps_mask_std)"/>
-    <param name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)"/>
-    <param name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)"/>
->>>>>>> 2e6d5e2f8a8b3ccbced63bda561a721788070099
 
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>

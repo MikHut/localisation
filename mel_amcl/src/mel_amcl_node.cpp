@@ -1620,7 +1620,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         double pose_discrepancy = sqrt( pow(last_received_gps_pose.v[0] - hyps[max_weight_hyp].pf_pose_mean.v[0],2) + pow(last_received_gps_pose.v[1] - hyps[max_weight_hyp].pf_pose_mean.v[1],2) );
 
-        if (pose_discrepancy > 10 &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
+        if (pose_discrepancy > 10+gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
         {
               ROS_WARN("Resetting AMCL pose due to pose discepancy");
               // reinitialise particle filter with the gps data

@@ -50,6 +50,8 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
   double yaw_cov;
   double euclidean_distance_sqared;
   double euclidean_p;
+  double euclidean_denom;
+  double yaw_denom;
 
   total_weight = 0.0;
 
@@ -57,8 +59,8 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
   double additional_pose_cov = pow(data->additional_pose_std,2);
   double additional_yaw_cov = pow(data->additional_yaw_std,2);
 
-  // to be conservative choose the largest reported error from GNSS receiver
-  // to avoid multiple calculations in loop - get total cov now
+  // To be conservative choose the largest reported error from GNSS receiver
+  // To avoid multiple calculations in loop - get total cov now
   if (data->pose_std.v[0] > data->pose_std.v[1])
   {
     pose_cov = pow(data->pose_std.v[0],2) + additional_pose_cov;
@@ -68,12 +70,18 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
     pose_cov = pow(data->pose_std.v[1],2) + additional_pose_cov;
   }
   
-  // to avoid multiple calculations in loop - get total cov now
+  // To avoid multiple calculations in loop - get total cov now
   if (data->use_ekf_yaw)
   {
     yaw_cov = pow(data->pose_std.v[2],2) + additional_yaw_cov;
   }
 
+
+  // Precomputing values where possible 
+  euclidean_denom = sqrt(2 * M_PI * pose_cov);
+  yaw_denom = sqrt(2 * M_PI * yaw_cov);
+
+  
 
   // Compute the sample weights
   for (j = 0; j < set->sample_count; j++)
@@ -84,9 +92,9 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
     pose = sample->pose;
 
 
-    euclidean_distance_sqared = pow(pose.v[0] - data->pose.v[0],2) + pow(pose.v[1] - data->pose.v[0],2);
+    euclidean_distance_sqared = pow(pose.v[0] - data->pose.v[0],2) + pow(pose.v[1] - data->pose.v[1],2);
 
-    euclidean_p = exp(-0.5 * (euclidean_distance_sqared / pose_cov) ) / sqrt(2 * M_PI * pose_cov);
+    euclidean_p = exp(-0.5 * (euclidean_distance_sqared / pose_cov) ) / euclidean_denom;
     
 
     if (data->use_ekf_yaw)
@@ -100,7 +108,7 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
 
       angle_error -= M_PI;
       
-      double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / yaw_cov)) / sqrt(2 * M_PI * yaw_cov);
+      double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / yaw_cov)) / yaw_denom;
       p = euclidean_p*yaw_p;
     }
     else

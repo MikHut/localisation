@@ -218,7 +218,8 @@ private:
   // GPS related variables
   pf_vector_t last_received_gps_pose;
   pf_vector_t last_received_gps_std;
-  double last_received_gps_yaw_std;
+  pf_vector_t last_received_gps_raw_std = pf_vector_zero();
+  double last_received_gps_yaw_std = 0;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
@@ -229,8 +230,6 @@ private:
   // This will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   bool use_gps_odom;
   bool gps_received = false;
-  bool gps_raw_received = false;
-  bool gps_raw_yaw_received = false;
   double gps_mask_std;
   double additional_pose_std_;
   double additional_yaw_std_;
@@ -630,10 +629,9 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
   last_gps_msg_received_ts_ = msg.header.stamp; //ros::Time::now();
   last_received_gps_pose = gps_pose;
   
-  if (!gps_raw_received)
-  {
-    last_received_gps_std = gps_std;
-  }
+
+  last_received_gps_std = gps_std;
+
 
   last_received_gps_msg = msg;
 
@@ -654,14 +652,13 @@ void AmclNode::gpsRawReceived(const nav_msgs::OdometryConstPtr &msg)
 
 void AmclNode::handleGPSRawMessage(const nav_msgs::Odometry &msg)
 {
-  gps_raw_received = true;
   pf_vector_t gps_std = pf_vector_zero();
 
   gps_std.v[0] = sqrt(msg.pose.covariance[0]);
   gps_std.v[1] = sqrt(msg.pose.covariance[7]);
   gps_std.v[2] = sqrt(msg.pose.covariance[35]);
 
-  last_received_gps_std = gps_std;
+  last_received_gps_raw_std = gps_std;
 }
 
 void AmclNode::gpsRawYawReceived(const sensor_msgs::ImuConstPtr &msg)
@@ -672,7 +669,6 @@ void AmclNode::gpsRawYawReceived(const sensor_msgs::ImuConstPtr &msg)
 
 void AmclNode::handleGPSRawYawMessage(const sensor_msgs::Imu &msg)
 {
-  gps_raw_yaw_received = true;
   last_received_gps_yaw_std = sqrt(msg.orientation_covariance[8]);
   //ROS_INFO("last_received_gps_yaw_std: %.4f", last_received_gps_yaw_std);
 }
@@ -1460,14 +1456,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       
       pdata.pose = last_received_gps_pose;
 
-      pdata.pose_std.v[0] = last_received_gps_std.v[0] * 3;
-      pdata.pose_std.v[1] = last_received_gps_std.v[1] * 3;
-      pdata.pose_std.v[2] = last_received_gps_std.v[2] * 3; // *3 to be conservative to account for incorrect gps error estimate
-      if (gps_raw_yaw_received)
-      {
-        pdata.pose_std.v[2] = last_received_gps_yaw_std * 3; // *3 to be conservative to account for incorrect gps error estimate
-      }
-
+      pdata.pose_std.v[0] = std::max(last_received_gps_raw_std.v[0], last_received_gps_std.v[0]) * 3;
+      pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]) * 3; 
+      pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]) * 3;
+  
       pdata.additional_pose_std = additional_pose_std_;
       pdata.additional_yaw_std = additional_yaw_std_;
       pdata.use_ekf_yaw = use_ekf_yaw;

@@ -55,6 +55,7 @@
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Empty.h"
 #include "std_msgs/Float64.h"
+#include "sensor_msgs/Imu.h"
 
 // For transform support
 #include "tf2/LinearMath/Transform.h"
@@ -122,6 +123,8 @@ static const std::string scan_topic_ = "scan";
 static const std::string gps_map_frame_topic_ = "gps/map_pose_yaw";
 // in case we have a datum relating to the map and use navsat_transform_node instead of gps_transform.py:
 static const std::string gps_odom_topic_ = "odometry/gps"; 
+static const std::string gps_raw_topic_ = "odometry/gps/unfiltered"; 
+static const std::string gps_raw_yaw_topic_ = "yaw"; 
 
 
 /* This function is only useful to have the whole code work
@@ -180,6 +183,11 @@ private:
   void mapReceived(const nav_msgs::OccupancyGridConstPtr &msg);
   void gpsPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void gpsOdomReceived(const nav_msgs::Odometry odom_msg);
+  void gpsRawReceived(const nav_msgs::OdometryConstPtr &msg);
+  void gpsRawYawReceived(const sensor_msgs::ImuConstPtr &msg);
+  void handleGPSRawMessage(const nav_msgs::Odometry &msg);
+  void handleGPSRawYawMessage(const sensor_msgs::Imu &msg);
+
   void handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamped &msg);
 
   void handleMapMessage(const nav_msgs::OccupancyGrid &msg);
@@ -210,15 +218,19 @@ private:
   // GPS related variables
   pf_vector_t last_received_gps_pose;
   pf_vector_t last_received_gps_std;
+  double last_received_gps_yaw_std;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
   bool use_gps;
   bool use_ekf_yaw;
+  bool use_raw_gps_errors;
   // For navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
   // This will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   bool use_gps_odom;
   bool gps_received = false;
+  bool gps_raw_received = false;
+  bool gps_raw_yaw_received = false;
   double gps_mask_std;
   double additional_pose_std_;
   double additional_yaw_std_;
@@ -236,6 +248,8 @@ private:
   ros::Subscriber initial_pose_sub_;
   ros::Subscriber gps_pose_sub_;
   ros::Subscriber gps_odom_sub_;
+  ros::Subscriber gps_error_sub_;
+  ros::Subscriber gps_yaw_error_sub_;
   std::vector<AMCLLaser *> lasers_;
   std::vector<bool> lasers_update_;
   std::map<std::string, int> frame_to_laser_;
@@ -475,6 +489,7 @@ AmclNode::AmclNode() :
   // For GPS
   private_nh_.param("use_gps", use_gps, true);
   private_nh_.param("use_ekf_yaw", use_ekf_yaw, true);
+  private_nh_.param("use_raw_gps_errors", use_raw_gps_errors, true);
   // for navsat_transform node & georeferenced datum in map or for robot_localisation ekf output (incase we want to fiter gps first)
   // this will be particularly useful for fusing noisy gps and imu data instea of dual rtk.
   private_nh_.param("use_gps_odom", use_gps_odom, false);
@@ -573,6 +588,12 @@ AmclNode::AmclNode() :
   }
 
 
+  if (use_raw_gps_errors)
+  {
+    gps_error_sub_ = nh_.subscribe(gps_raw_topic_, 5, &AmclNode::gpsRawReceived, this);
+    gps_yaw_error_sub_ = nh_.subscribe(gps_raw_yaw_topic_, 5, &AmclNode::gpsRawYawReceived, this);
+  }
+
   diagnosic_updater_.setHardwareID("None");
   diagnosic_updater_.add("Standard deviation", this, &AmclNode::standardDeviationDiagnostics);
 }
@@ -608,7 +629,11 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
 
   last_gps_msg_received_ts_ = msg.header.stamp; //ros::Time::now();
   last_received_gps_pose = gps_pose;
-  last_received_gps_std = gps_std;
+  
+  if (!gps_raw_received)
+  {
+    last_received_gps_std = gps_std;
+  }
 
   last_received_gps_msg = msg;
 
@@ -618,6 +643,38 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
     filtered_gps_pose_pub_.publish(msg);
   }
 
+}
+
+
+void AmclNode::gpsRawReceived(const nav_msgs::OdometryConstPtr &msg)
+{
+  handleGPSRawMessage(*msg);
+}
+
+
+void AmclNode::handleGPSRawMessage(const nav_msgs::Odometry &msg)
+{
+  gps_raw_received = true;
+  pf_vector_t gps_std = pf_vector_zero();
+
+  gps_std.v[0] = sqrt(msg.pose.covariance[0]);
+  gps_std.v[1] = sqrt(msg.pose.covariance[7]);
+  gps_std.v[2] = sqrt(msg.pose.covariance[35]);
+
+  last_received_gps_std = gps_std;
+}
+
+void AmclNode::gpsRawYawReceived(const sensor_msgs::ImuConstPtr &msg)
+{
+  handleGPSRawYawMessage(*msg);
+}
+
+
+void AmclNode::handleGPSRawYawMessage(const sensor_msgs::Imu &msg)
+{
+  gps_raw_yaw_received = true;
+  last_received_gps_yaw_std = sqrt(msg.orientation_covariance[8]);
+  //ROS_INFO("last_received_gps_yaw_std: %.4f", last_received_gps_yaw_std);
 }
 
 
@@ -643,6 +700,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   // GPS parameters
   use_gps = config.use_gps;
   use_ekf_yaw = config.use_ekf_yaw;
+  use_raw_gps_errors = config.use_raw_gps_errors;
   use_gps_odom = config.use_gps_odom;
   gps_mask_std = config.gps_mask_std;
   additional_pose_std_ = config.gps_additional_pose_std;
@@ -1402,7 +1460,13 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       
       pdata.pose = last_received_gps_pose;
 
-      pdata.pose_std = last_received_gps_std;
+      pdata.pose_std.v[0] = last_received_gps_std.v[0] * 3;
+      pdata.pose_std.v[1] = last_received_gps_std.v[1] * 3;
+      pdata.pose_std.v[2] = last_received_gps_std.v[2] * 3; // *3 to be conservative to account for incorrect gps error estimate
+      if (gps_raw_yaw_received)
+      {
+        pdata.pose_std.v[2] = last_received_gps_yaw_std * 3; // *3 to be conservative to account for incorrect gps error estimate
+      }
 
       pdata.additional_pose_std = additional_pose_std_;
       pdata.additional_yaw_std = additional_yaw_std_;
@@ -1628,12 +1692,24 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
               degraded_amcl_localisation_counter = 0;
         }
 
+        bool reset_pose = false;
         if (weight_gps_from_scan > weight_amcl_from_scan)
         {
           // publish gps position on gps_transform/filtered topic
           filtered_gps_pose_pub_.publish(last_received_gps_msg);
 
-          if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 5))
+          if (laser_model_type_ == LASER_MODEL_LIKELIHOOD_FIELD)
+          {
+            if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
+              reset_pose = true;
+          }
+          else if (laser_model_type_ == LASER_MODEL_LIKELIHOOD_FIELD_PROB)
+          {
+            if ((weight_amcl_from_scan < -20) && (weight_gps_from_scan > -20))
+              reset_pose = true;
+          }
+
+          if (reset_pose)
           {
             degraded_amcl_localisation_counter++;
             use_filtered_amcl_pose_ = false;

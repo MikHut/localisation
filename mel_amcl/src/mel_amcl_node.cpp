@@ -233,6 +233,7 @@ private:
   double gps_mask_std;
   double additional_pose_std_;
   double additional_yaw_std_;
+  bool filter_scan_by_range;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 4;
   int degraded_amcl_localisation_counter = 0;
@@ -484,6 +485,8 @@ AmclNode::AmclNode() :
   private_nh_.param("recovery_alpha_slow", alpha_slow_, 0.001);
   private_nh_.param("recovery_alpha_fast", alpha_fast_, 0.1);
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
+  private_nh_.param("filter_scan_by_range", filter_scan_by_range, true);
+
 
   // For GPS
   private_nh_.param("use_gps", use_gps, true);
@@ -717,6 +720,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   transform_tolerance_.fromSec(config.transform_tolerance);
 
   max_beams_ = config.laser_max_beams;
+  filter_scan_by_range = config.filter_scan_by_range;
   alpha1_ = config.odom_alpha1;
   alpha2_ = config.odom_alpha2;
   alpha3_ = config.odom_alpha3;
@@ -1534,17 +1538,41 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     // The AMCLLaserData destructor will free this memory
     ldata.ranges = new double[ldata.range_count][2];
     ROS_ASSERT(ldata.ranges);
-    for(int i=0;i<ldata.range_count;i++)
+    
+    if (filter_scan_by_range)
     {
-      // amcl doesn't (yet) have a concept of min range.  So we'll map short
-      // readings to max range.
-      if(laser_scan->ranges[i] <= range_min)
-        ldata.ranges[i][0] = ldata.range_max;
-      else
-        ldata.ranges[i][0] = laser_scan->ranges[i];
-      // Compute bearing
-      ldata.ranges[i][1] = angle_min +
-              (i * angle_increment);
+      int j{0};
+      for(int i=0;i<ldata.range_count;i++)
+      {
+        // amcl doesn't (yet) have a concept of min range.  So we'll map short
+        // readings to max range.
+        if(laser_scan->ranges[i] <= range_min || laser_scan->ranges[i] >= ldata.range_max)
+          continue;
+        else
+        {
+          ldata.ranges[j][0] = laser_scan->ranges[i];
+          // Compute bearing
+          ldata.ranges[j][1] = angle_min +
+                (i * angle_increment);
+          j++;
+        }
+      }
+      ldata.range_count = j+1;
+    }
+    else
+    {
+      for(int i=0;i<ldata.range_count;i++)
+      {
+        // amcl doesn't (yet) have a concept of min range.  So we'll map short
+        // readings to max range.
+        if(laser_scan->ranges[i] <= range_min)
+          ldata.ranges[i][0] = ldata.range_max;
+        else
+          ldata.ranges[i][0] = laser_scan->ranges[i];
+        // Compute bearing
+        ldata.ranges[i][1] = angle_min +
+                (i * angle_increment);
+      }
     }
 
     lasers_[laser_index]->UpdateSensor(pf_, (AMCLSensorData*)&ldata);

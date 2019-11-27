@@ -37,6 +37,9 @@
 
 #include "mel_amcl/sensors/mel_amcl_laser.h"
 
+// roscpp
+#include "ros/ros.h"
+
 using namespace mel_amcl;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -308,6 +311,8 @@ double AMCLLaser::LikelihoodFieldModelProb(AMCLLaserData *data, pf_sample_set_t*
   int i, j, step;
   double z, pz;
   double log_p;
+  double p;
+
   double obs_range, obs_bearing;
   double total_weight;
   pf_sample_t *sample;
@@ -379,7 +384,8 @@ double AMCLLaser::LikelihoodFieldModelProb(AMCLLaserData *data, pf_sample_set_t*
     pose = pf_vector_coord_add(self->laser_pose, pose);
 
     log_p = 0;
-    
+    p = 1.0;
+
     beam_ind = 0;
     
     for (i = 0; i < data->range_count; i += step, beam_ind++)
@@ -435,13 +441,15 @@ double AMCLLaser::LikelihoodFieldModelProb(AMCLLaserData *data, pf_sample_set_t*
             
       if(!do_beamskip){
 	log_p += log(pz);
+  p += pz*pz*pz;
       }
       else{
 	self->temp_obs[j][beam_ind] = pz; 
       }
     }
     if(!do_beamskip){
-      sample->weight *= exp(log_p);
+      //sample->weight *= exp(log_p);
+      sample->weight *= p;
       total_weight += sample->weight;
     }
   }
@@ -457,6 +465,8 @@ double AMCLLaser::LikelihoodFieldModelProb(AMCLLaserData *data, pf_sample_set_t*
 	skipped_beam_count++; 
       }
     }
+
+    ROS_INFO("Skipped beam count: %d", (skipped_beam_count));
 
     //we check if there is at least a critical number of beams that agreed with the map 
     //otherwise it probably indicates that the filter converged to a wrong solution
@@ -475,14 +485,17 @@ double AMCLLaser::LikelihoodFieldModelProb(AMCLLaserData *data, pf_sample_set_t*
 	pose = sample->pose;
 
 	log_p = 0;
+  p = 0;
 
 	for (beam_ind = 0; beam_ind < self->max_beams; beam_ind++){
 	  if(error || obs_mask[beam_ind]){
 	    log_p += log(self->temp_obs[j][beam_ind]);
+      p += self->temp_obs[j][beam_ind]*self->temp_obs[j][beam_ind]*self->temp_obs[j][beam_ind];
 	  }
 	}
 	
-	sample->weight *= exp(log_p);
+  //sample->weight *= exp(log_p);
+	sample->weight *= p;
 	
 	total_weight += sample->weight;
       }      
@@ -659,6 +672,8 @@ double AMCLLaser::LikelihoodFieldModelProbFromPose(AMCLLaserData *data, double x
   int i, step;
   double z, pz;
   double log_p;
+  double p;
+
   double obs_range, obs_bearing;
   double weight;
   pf_vector_t pose;
@@ -730,6 +745,7 @@ double AMCLLaser::LikelihoodFieldModelProbFromPose(AMCLLaserData *data, double x
     // Take account of the laser pose relative to the robot
 
   log_p = 0;
+  p = 1.0;
 
   beam_ind = 0;
 
@@ -791,6 +807,7 @@ double AMCLLaser::LikelihoodFieldModelProbFromPose(AMCLLaserData *data, double x
     //if (!do_beamskip)
     //{
       log_p += log(pz);
+      p += pz*pz*pz;
     //}
     //else
     //{
@@ -800,7 +817,9 @@ double AMCLLaser::LikelihoodFieldModelProbFromPose(AMCLLaserData *data, double x
   //if (!do_beamskip)
   //{
   //weight += exp(log_p);
-  weight += log_p;
+  //weight += log_p;
+  weight += p;
+
 
   //}
 

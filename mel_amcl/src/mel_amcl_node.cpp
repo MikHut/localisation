@@ -55,6 +55,7 @@
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Empty.h"
 #include "std_msgs/Float64.h"
+#include "std_msgs/Int8.h"
 #include "sensor_msgs/Imu.h"
 
 // For transform support
@@ -296,6 +297,8 @@ private:
   ros::Publisher filtered_amcl_pose_pub_;
   ros::Publisher filtered_gps_pose_pub_;
   ros::Publisher localisation_quality_pub_;
+  ros::Publisher mel_status_pub;
+  ros::Publisher localisation_discrepancy_pub;
   ros::ServiceServer global_loc_srv_;
   ros::ServiceServer nomotion_update_srv_; //to let amcl update samples without requiring motion
   ros::ServiceServer set_map_srv_;
@@ -527,6 +530,8 @@ AmclNode::AmclNode() :
   pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", 2, true);
   particlecloud_pub_ = nh_.advertise<geometry_msgs::PoseArray>("particlecloud", 2, true);
   localisation_quality_pub_ = nh_.advertise<std_msgs::Float64>("amcl_quality", 2, true);
+  localisation_discrepancy_pub = nh_.advertise<std_msgs::Float64>("health/mel/gps_amcl_pose_discrepancy", 2, true);
+  mel_status_pub = nh_.advertise<std_msgs::Int8>("health/mel/status", 2, true);
   filtered_amcl_pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose/filtered", 2, true);
   
   global_loc_srv_ = nh_.advertiseService("global_localization", 
@@ -625,8 +630,8 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
   gps_pose.v[1] = msg.pose.pose.position.y;
   gps_pose.v[2] = tf2::getYaw(msg.pose.pose.orientation);
 
-  gps_std.v[0] = sqrt(msg.pose.covariance[0]);
-  gps_std.v[1] = sqrt(msg.pose.covariance[7]);
+  gps_std.v[0] = sqrt(std::max(msg.pose.covariance[0], msg.pose.covariance[7]));
+  gps_std.v[1] = gps_std.v[0];
   gps_std.v[2] = sqrt(msg.pose.covariance[35]);
 
   last_gps_msg_received_ts_ = msg.header.stamp; //ros::Time::now();
@@ -656,9 +661,8 @@ void AmclNode::gpsRawReceived(const nav_msgs::OdometryConstPtr &msg)
 void AmclNode::handleGPSRawMessage(const nav_msgs::Odometry &msg)
 {
   pf_vector_t gps_std = pf_vector_zero();
-
-  gps_std.v[0] = sqrt(msg.pose.covariance[0]);
-  gps_std.v[1] = sqrt(msg.pose.covariance[7]);
+  gps_std.v[0] = sqrt(std::max(msg.pose.covariance[0], msg.pose.covariance[7]));
+  gps_std.v[1] = gps_std.v[0];
   gps_std.v[2] = sqrt(msg.pose.covariance[35]);
 
   last_received_gps_raw_std = gps_std;
@@ -1703,6 +1707,35 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         // degraded_amcl_localisation_count_max times in a row
 
         double pose_discrepancy = sqrt( pow(last_received_gps_pose.v[0] - hyps[max_weight_hyp].pf_pose_mean.v[0],2) + pow(last_received_gps_pose.v[1] - hyps[max_weight_hyp].pf_pose_mean.v[1],2) );
+        std_msgs::Float64 localisation_discrepancy;
+        localisation_discrepancy.data = pose_discrepancy;
+        localisation_discrepancy_pub.publish(localisation_discrepancy);
+
+        int mel_status = 0;
+        std_msgs::Int8 mel_status_msg;
+        if (pose_discrepancy < 1 &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
+        {
+          if (weight_amcl_from_scan > 3)
+            mel_status = 4;
+          else
+            mel_status =3;
+        }
+        else if (pose_discrepancy < 5 + pdata.pose_std.v[0] && weight_amcl_from_scan > 5)
+        {
+          mel_status =2;
+        }
+        else if (weight_amcl_from_scan > 4)
+        {
+          mel_status =1;
+        }
+        else
+        { 
+          mel_status = 0;
+        }
+
+        mel_status_msg.data = mel_status;
+        mel_status_pub.publish(mel_status_msg);
+
 
         if (pose_discrepancy > 10+gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
         {
@@ -1713,8 +1746,9 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         }
 
         bool reset_pose = false;
-        if (weight_gps_from_scan > weight_amcl_from_scan)
+        if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std)
         {
+          degraded_amcl_localisation_counter++;
           // publish gps position on gps_transform/filtered topic
           filtered_gps_pose_pub_.publish(last_received_gps_msg);
 
@@ -1729,18 +1763,19 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
               reset_pose = true;
           }
 
+          if (degraded_amcl_localisation_counter >degraded_amcl_localisation_count_max)
+            reset_pose = true;
+
           if (reset_pose)
           {
-            degraded_amcl_localisation_counter++;
+            
             use_filtered_amcl_pose_ = false;
-            if (degraded_amcl_localisation_counter >= degraded_amcl_localisation_count_max)
-            {
-              ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
 
-              // reinitialise particle filter with the gps data
-              handleInitialPoseMessage(last_received_gps_msg);
-              degraded_amcl_localisation_counter = 0;
-            }
+            ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
+
+            // reinitialise particle filter with the gps data
+            handleInitialPoseMessage(last_received_gps_msg);
+            degraded_amcl_localisation_counter = 0;
           }
         }
         else

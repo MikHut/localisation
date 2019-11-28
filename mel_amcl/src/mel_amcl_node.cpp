@@ -234,6 +234,7 @@ private:
   double gps_mask_std;
   double additional_pose_std_;
   double additional_yaw_std_;
+  double pose_error_factor;
   bool filter_scan_by_range;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 4;
@@ -501,7 +502,7 @@ AmclNode::AmclNode() :
   private_nh_.param("gps_mask_std", gps_mask_std, 0.12);
   private_nh_.param("gps_additional_pose_std", additional_pose_std_, 0.6);
   private_nh_.param("gps_additional_yaw_std", additional_yaw_std_, 0.4);
-
+  private_nh_.param("gps_additional_yaw_std", pose_error_factor, 3.0);
 
   // For diagnostics
   private_nh_.param("std_warn_level_x", std_warn_level_x_, 0.2);
@@ -708,7 +709,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   gps_mask_std = config.gps_mask_std;
   additional_pose_std_ = config.gps_additional_pose_std;
   additional_yaw_std_ = config.gps_additional_yaw_std;
-
+  pose_error_factor = config.pose_error_factor;
 
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;
@@ -1464,9 +1465,9 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       
       pdata.pose = last_received_gps_pose;
 
-      pdata.pose_std.v[0] = std::max(last_received_gps_raw_std.v[0], last_received_gps_std.v[0]) * 3;
-      pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]) * 3; 
-      pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]) * 3;
+      pdata.pose_std.v[0] = std::max(last_received_gps_raw_std.v[0], last_received_gps_std.v[0]);
+      pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]); 
+      pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]);
   
       pdata.additional_pose_std = additional_pose_std_;
       pdata.additional_yaw_std = additional_yaw_std_;
@@ -1479,7 +1480,11 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       {
         if ( pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std )
         {
-          pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata);
+          AMCLPoseData pdata_factored;
+          pdata_factored.pose.v[0] = pdata.pose_std.v[0] * pose_error_factor;
+          pdata_factored.pose.v[1] = pdata.pose_std.v[1] * pose_error_factor;
+          pdata_factored.pose.v[2] = pdata.pose_std.v[2] * pose_error_factor;
+          pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata_factored);
         }
         else
         {
@@ -1713,25 +1718,20 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         int mel_status = 0;
         std_msgs::Int8 mel_status_msg;
-        if (pose_discrepancy < 1 &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
-        {
-          if (weight_amcl_from_scan > 3)
+        if (pose_discrepancy < 0.3 &&  pdata.pose_std.v[0] < 0.1 && weight_amcl_from_scan > 5)
+          mel_status = 6;
+        else if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.06)
+            mel_status = 5;
+        else if (pose_discrepancy < 0.5 && pdata.pose_std.v[0] < 0.2 && weight_amcl_from_scan > 5)
             mel_status = 4;
-          else
-            mel_status =3;
-        }
-        else if (pose_discrepancy < 5 + pdata.pose_std.v[0] && weight_amcl_from_scan > 5)
-        {
-          mel_status =2;
-        }
-        else if (weight_amcl_from_scan > 4)
-        {
-          mel_status =1;
-        }
+        else if (pose_discrepancy < 0.5+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < 0.4 && weight_amcl_from_scan > 5)
+            mel_status = 3;
+        else if (pose_discrepancy < 5 + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > 5)
+          mel_status = 2;
+        else if (weight_amcl_from_scan > 5) // add bit about particle spread < something for converged
+          mel_status = 1;
         else
-        { 
           mel_status = 0;
-        }
 
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);

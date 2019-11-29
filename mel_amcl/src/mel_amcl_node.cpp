@@ -237,7 +237,7 @@ private:
   double pose_error_factor;
   bool filter_scan_by_range;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
-  int degraded_amcl_localisation_count_max = 4;
+  int degraded_amcl_localisation_count_max = 8;
   int degraded_amcl_localisation_counter = 0;
 
   map_t *map_;
@@ -295,8 +295,6 @@ private:
   ros::NodeHandle private_nh_;
   ros::Publisher pose_pub_;
   ros::Publisher particlecloud_pub_;
-  ros::Publisher filtered_amcl_pose_pub_;
-  ros::Publisher filtered_gps_pose_pub_;
   ros::Publisher localisation_quality_pub_;
   ros::Publisher mel_status_pub;
   ros::Publisher localisation_discrepancy_pub;
@@ -532,9 +530,7 @@ AmclNode::AmclNode() :
   particlecloud_pub_ = nh_.advertise<geometry_msgs::PoseArray>("particlecloud", 2, true);
   localisation_quality_pub_ = nh_.advertise<std_msgs::Float64>("amcl_quality", 2, true);
   localisation_discrepancy_pub = nh_.advertise<std_msgs::Float64>("health/mel/gps_amcl_pose_discrepancy", 2, true);
-  mel_status_pub = nh_.advertise<std_msgs::Int8>("health/mel/status", 2, true);
-  filtered_amcl_pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose/filtered", 2, true);
-  
+  mel_status_pub = nh_.advertise<std_msgs::Int8>("health/mel/status", 2, true);  
   global_loc_srv_ = nh_.advertiseService("global_localization", 
 					 &AmclNode::globalLocalizationCallback,
                                          this);
@@ -578,8 +574,6 @@ AmclNode::AmclNode() :
   {
 
   gps_odom_sub_ = nh_.subscribe(gps_odom_topic_, 5, &AmclNode::gpsOdomReceived, this);
-  filtered_gps_pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("gps/map_pose_amcl/filtered", 2, true);
-
   gps_check_interval_ = ros::Duration(2.0);
   check_gps_timer_ = nh_.createTimer(gps_check_interval_,
                                        boost::bind(&AmclNode::checkGPSReceived, this, _1));    
@@ -588,8 +582,6 @@ AmclNode::AmclNode() :
   {
 
   gps_pose_sub_ = nh_.subscribe(gps_map_frame_topic_, 5, &AmclNode::gpsPoseReceived, this);
-  filtered_gps_pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("gps/map_pose_amcl/filtered", 2, true);
-
   gps_check_interval_ = ros::Duration(2.0);
   check_gps_timer_ = nh_.createTimer(gps_check_interval_,
                                        boost::bind(&AmclNode::checkGPSReceived, this, _1));    
@@ -644,11 +636,6 @@ void AmclNode::handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamp
 
   last_received_gps_msg = msg;
 
-  if (use_gps_without_scan == true || !first_map_received_)
-  {
-    // TODO: publish map tf using data from gps message - make sure this is undone if lasers come back
-    filtered_gps_pose_pub_.publish(msg);
-  }
 
 }
 
@@ -1654,7 +1641,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       }
     }
 
-    bool use_filtered_amcl_pose_;
 
     if (max_weight > 0.0)
     {
@@ -1718,13 +1704,13 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         int mel_status = 0;
         std_msgs::Int8 mel_status_msg;
-        if (pose_discrepancy < 0.3 &&  pdata.pose_std.v[0] < 0.1 && weight_amcl_from_scan > 5)
+        if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.1 && weight_amcl_from_scan > 5)
           mel_status = 6;
-        else if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.06)
+        else if (pose_discrepancy < 0.3 && pdata.pose_std.v[0] < 0.25 && weight_amcl_from_scan > 5)
             mel_status = 5;
-        else if (pose_discrepancy < 0.5 && pdata.pose_std.v[0] < 0.2 && weight_amcl_from_scan > 5)
+        else if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.06)
             mel_status = 4;
-        else if (pose_discrepancy < 0.5+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < 0.4 && weight_amcl_from_scan > 5)
+        else if (pose_discrepancy < 0.5+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < 0.7 && weight_amcl_from_scan > 2)
             mel_status = 3;
         else if (pose_discrepancy < 5 + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > 5)
           mel_status = 2;
@@ -1749,46 +1735,28 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std)
         {
           degraded_amcl_localisation_counter++;
-          // publish gps position on gps_transform/filtered topic
-          filtered_gps_pose_pub_.publish(last_received_gps_msg);
 
-          if (laser_model_type_ == LASER_MODEL_LIKELIHOOD_FIELD)
-          {
-            if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
+          if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
               reset_pose = true;
-          }
-          else if (laser_model_type_ == LASER_MODEL_LIKELIHOOD_FIELD_PROB)
-          {
-            if ((weight_amcl_from_scan < -20) && (weight_gps_from_scan > -20))
-              reset_pose = true;
-          }
 
-          if (degraded_amcl_localisation_counter >degraded_amcl_localisation_count_max)
+          if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
             reset_pose = true;
 
           if (reset_pose)
           {
-            
-            use_filtered_amcl_pose_ = false;
-
             ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
-
             // reinitialise particle filter with the gps data
             handleInitialPoseMessage(last_received_gps_msg);
             degraded_amcl_localisation_counter = 0;
           }
+
         }
+
         else
         {
           degraded_amcl_localisation_counter = 0;
-          // publish AMCL position on AMCL_pose/filtered topic
-          use_filtered_amcl_pose_ = true;
         }
 
-      }
-      else
-      {
-        use_filtered_amcl_pose_ = true;
       }
     }
 
@@ -1844,10 +1812,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
        */
 
       pose_pub_.publish(p);
-      if (use_filtered_amcl_pose_ == true)
-      {
-        filtered_amcl_pose_pub_.publish(p);
-      }
+
       last_published_pose = p;
 
       ROS_DEBUG("New pose: %6.3f %6.3f %6.3f",

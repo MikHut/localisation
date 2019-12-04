@@ -40,6 +40,12 @@
     <param name="use_ekf_yaw" value="$(arg use_ekf_yaw)" />
     <param name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)" />
 
+    <!-- MEL parameters -->
+    <param name="publish_mel_health_" value="true"/>
+    <param name="pose_discrepancy_thresholds" value="[0.2, 0.5, 5.0]"/>
+    <param name="gps_error_thresholds" value="[0.1, 0.25, 0.7]"/>
+    <param name="scan_match_thresholds" value="[8.0, 5.0, 2.0]"/>
+
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>
   	<param name="initial_pose_y" value="$(arg initial_pose_y)"/>

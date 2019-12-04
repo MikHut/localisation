@@ -239,6 +239,13 @@ private:
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 8;
   int degraded_amcl_localisation_counter = 0;
+  // mel health parameters
+  bool publish_mel_health_;
+  const int health_size = 3;
+  std::vector<double> pose_discrepancy_thresholds = {0.2, 0.5, 5.0};
+  std::vector<double> gps_error_thresholds = {0.2, 0.5, 5.0};
+  std::vector<double> scan_match_thresholds = {0.2, 0.5, 5.0};
+
 
   map_t *map_;
   char *mapdata;
@@ -501,6 +508,15 @@ AmclNode::AmclNode() :
   private_nh_.param("gps_additional_pose_std", additional_pose_std_, 0.6);
   private_nh_.param("gps_additional_yaw_std", additional_yaw_std_, 0.4);
   private_nh_.param("gps_additional_yaw_std", pose_error_factor, 3.0);
+
+  // MEL health params
+  private_nh_.param("publish_mel_health_", publish_mel_health_, false);
+  if (publish_mel_health_)
+  {
+    private_nh_.param("pose_discrepancy_thresholds", pose_discrepancy_thresholds, pose_discrepancy_thresholds);
+    private_nh_.param("gps_error_thresholds", gps_error_thresholds, gps_error_thresholds);
+    private_nh_.param("scan_match_thresholds", scan_match_thresholds, scan_match_thresholds);
+  }
 
   // For diagnostics
   private_nh_.param("std_warn_level_x", std_warn_level_x_, 0.2);
@@ -1704,17 +1720,17 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         int mel_status = 0;
         std_msgs::Int8 mel_status_msg;
-        if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.1 && weight_amcl_from_scan > 5)
+        if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0] && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 6;
-        else if (pose_discrepancy < 0.3 && pdata.pose_std.v[0] < 0.25 && weight_amcl_from_scan > 5)
+        else if (pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 5;
-        else if (pose_discrepancy < 0.2 &&  pdata.pose_std.v[0] < 0.06)
+        else if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0])
             mel_status = 4;
-        else if (pose_discrepancy < 0.5+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < 0.7 && weight_amcl_from_scan > 2)
+        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[2])
             mel_status = 3;
-        else if (pose_discrepancy < 5 + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > 5)
+        else if (pose_discrepancy < pose_discrepancy_thresholds[2] + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 2;
-        else if (weight_amcl_from_scan > 5) // add bit about particle spread < something for converged
+        else if (weight_amcl_from_scan > scan_match_thresholds[1]) // add bit about particle spread < something for converged
           mel_status = 1;
         else
           mel_status = 0;

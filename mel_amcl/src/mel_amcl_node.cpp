@@ -242,9 +242,9 @@ private:
   // mel health parameters
   bool publish_mel_health_;
   const int health_size = 3;
-  std::vector<double> pose_discrepancy_thresholds = {0.2, 0.5, 5.0};
-  std::vector<double> gps_error_thresholds = {0.2, 0.5, 5.0};
-  std::vector<double> scan_match_thresholds = {0.2, 0.5, 5.0};
+  std::vector<double> pose_discrepancy_thresholds = {0.2, 1.0, 5.0};
+  std::vector<double> gps_error_thresholds = {0.1, 0.25, 1.0};
+  std::vector<double> scan_match_thresholds = {15.0, 5.0, 2.0};
 
 
   map_t *map_;
@@ -1726,7 +1726,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
             mel_status = 5;
         else if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0])
             mel_status = 4;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[2])
+        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 3;
         else if (pose_discrepancy < pose_discrepancy_thresholds[2] + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 2;

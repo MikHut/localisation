@@ -42,9 +42,9 @@
 
     <!-- MEL parameters -->
     <param name="publish_mel_health_" value="true"/>
-    <param name="pose_discrepancy_thresholds" value="[0.2, 0.5, 5.0]"/>
-    <param name="gps_error_thresholds" value="[0.1, 0.25, 0.7]"/>
-    <param name="scan_match_thresholds" value="[8.0, 5.0, 2.0]"/>
+    <param name="pose_discrepancy_thresholds" value="[0.2, 1.0, 5.0]"/>
+    <param name="gps_error_thresholds" value="[0.1, 0.25, 1.5]"/>
+    <param name="scan_match_thresholds" value="[15.0, 5.0, 2.0]"/>
 
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>

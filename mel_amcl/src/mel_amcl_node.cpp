@@ -220,7 +220,7 @@ private:
   pf_vector_t last_received_gps_pose;
   pf_vector_t last_received_gps_std;
   pf_vector_t last_received_gps_raw_std = pf_vector_zero();
-  double last_received_gps_yaw_std = 0;
+  double last_received_gps_yaw_std = 0.1;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
   bool use_gps_without_scan;
@@ -507,7 +507,7 @@ AmclNode::AmclNode() :
   private_nh_.param("gps_mask_std", gps_mask_std, 0.12);
   private_nh_.param("gps_additional_pose_std", additional_pose_std_, 0.6);
   private_nh_.param("gps_additional_yaw_std", additional_yaw_std_, 0.4);
-  private_nh_.param("gps_additional_yaw_std", pose_error_factor, 3.0);
+  private_nh_.param("pose_error_factor", pose_error_factor, 3.0);
 
   // MEL health params
   private_nh_.param("publish_mel_health_", publish_mel_health_, false);
@@ -1484,9 +1484,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         if ( pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std )
         {
           AMCLPoseData pdata_factored;
-          pdata_factored.pose.v[0] = pdata.pose_std.v[0] * pose_error_factor;
-          pdata_factored.pose.v[1] = pdata.pose_std.v[1] * pose_error_factor;
-          pdata_factored.pose.v[2] = pdata.pose_std.v[2] * pose_error_factor;
+          pdata_factored.pose = pdata.pose;
+          pdata_factored.pose_std.v[0] = pdata.pose_std.v[0] * pose_error_factor;
+          pdata_factored.pose_std.v[1] = pdata.pose_std.v[1] * pose_error_factor;
+          pdata_factored.pose_std.v[2] = pdata.pose_std.v[2] * pose_error_factor;
           pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata_factored);
         }
         else

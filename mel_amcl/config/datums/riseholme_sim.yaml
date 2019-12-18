@@ -1,0 +1,30 @@
+
+datum_latitude: &datum_latitude 53.2686053
+datum_longitude: &datum_longitude -0.524217
+datum_heading: &datum_heading 178.4575 #4.86
+
+
+gnss_fence:
+  gnss_fence_coords: [[53.268732, -0.525170], [53.268301, -0.524611], [53.268337, -0.524040], [53.268799, -0.524149]]
+
+
+mapviz_initialize_origin:
+  local_xy_origins: 
+    - {
+    name: dont_change_this,
+    latitude: *datum_latitude,
+    longitude: *datum_longitude,
+    altitude: 100.0,
+    heading: *datum_heading
+    }
+
+navsat_transform_node:
+  magnetic_declination_radians: 0.0
+  yaw_offset: 0.0
+  zero_altitude: true
+  broadcast_utm_transform: false
+  broadcast_utm_transform_as_parent_frame: false
+  publish_filtered_gps: true
+  use_odometry_yaw: false
+  wait_for_datum: true
+  datum: [ *datum_latitude, *datum_longitude, 0.1476]

@@ -18,11 +18,19 @@ class GNSS_fence:
 
         self.gnss_fence_coords = rospy.get_param("~gnss_fence_coords")
 
+
+        # Check that we are in a single UTM zone
+        self.error = False
+        self.utm_zone_nums = []
+        self.utm_zone_lets = []
+
+
         self.create_polygon()
 
 
         # Publishers
         self.fence_status_pub = rospy.Publisher('/gnss_fence/status_within', Bool, queue_size=1)
+
 
         # Subscribers
         self.navsat_subscriber = rospy.Subscriber('/gps/fix', NavSatFix, self.navsat_callback, queue_size = 10)
@@ -31,12 +39,18 @@ class GNSS_fence:
 
     def navsat_callback(self, msg):
 
+        status_msg = Bool()
+
         # TODO - Handle different zones
-        easting, northing, _, _ = utm.from_latlon(msg.latitude, msg.longitude) # _, _ : zone_num, zone_let
+        easting, northing, zone_num, zone_let = utm.from_latlon(msg.latitude, msg.longitude) # _, _ : zone_num, zone_let
         utm_coord = Point(easting, northing)
 
-        status_msg = Bool()
-        status_msg.data = utm_coord.within(self.fence)
+        if not self.error:
+            status_msg.data = utm_coord.within(self.fence)  
+        else:
+            status_msg.data = False
+            rospy.logerr("The field crosses a utm zone! Zones are: %s %s \n Current Robot position is in zone: %s %s ", self.utm_zone_nums, self.utm_zone_lets, zone_num, zone_let)
+
         
         self.fence_status_pub.publish(status_msg)
 
@@ -48,12 +62,19 @@ class GNSS_fence:
         utm_coords = []
         for i in self.gnss_fence_coords:
             print i
-            easting, northing, _, _ = utm.from_latlon(i[0], i[1]) # TODO - Handle different zones
+            easting, northing, zone_num, zone_let = utm.from_latlon(i[0], i[1]) # TODO - Handle different zones
             utm_coords.append([easting, northing])
+            self.utm_zone_nums.append(zone_num)
+            self.utm_zone_lets.append(zone_let)
 
         print 'utm coords: ', utm_coords
 
-        self.fence = Polygon(utm_coords)
+        # Check entire field is in the same zone before continuing
+        if all(i == self.utm_zone_lets[0] for i in self.utm_zone_lets) and all(i == self.utm_zone_nums[0] for i in self.utm_zone_nums):
+            self.fence = Polygon(utm_coords)
+        else:
+            self.error = True
+            rospy.logerr("The field crosses a utm zone!!! Zones are: %s %s ", self.utm_zone_nums, self.utm_zone_lets)
 
 
 

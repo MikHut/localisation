@@ -1,10 +1,11 @@
 
-datum_latitude: &datum_latitude 53.268642038
-datum_longitude: &datum_longitude -0.524509505881
+datum_latitude: &datum_latitude 53.2686053
+datum_longitude: &datum_longitude -0.524217
+datum_heading: &datum_heading 178.4575 #4.86
 
 
 gnss_fence:
-  gnss_fence_coords: [[53.268729, -0.525051], [53.268227, -0.524909], [53.268307, -0.523978], [53.268799, -0.524110]]
+  gnss_fence_coords: [[53.268732, -0.525170], [53.268301, -0.524611], [53.268337, -0.524040], [53.268799, -0.524149]]
 
 
 mapviz_initialize_origin:
@@ -14,7 +15,7 @@ mapviz_initialize_origin:
     latitude: *datum_latitude,
     longitude: *datum_longitude,
     altitude: 100.0,
-    heading: 0.0
+    heading: *datum_heading
     }
 
 navsat_transform_node:
@@ -26,4 +27,4 @@ navsat_transform_node:
   publish_filtered_gps: true
   use_odometry_yaw: false
   wait_for_datum: true
-  datum: [ *datum_latitude, *datum_longitude, 0.0]
+  datum: [ *datum_latitude, *datum_longitude, 0.1476]

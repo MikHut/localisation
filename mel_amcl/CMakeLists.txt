@@ -24,9 +24,16 @@ find_package(catkin REQUIRED
     mapviz_plugins
     robot_localization
     gmapping
+    rospy
 )
 
+
+
 find_package(Boost REQUIRED)
+
+
+catkin_python_setup()
+
 
 # dynamic reconfigure
 generate_dynamic_reconfigure_options(
@@ -49,6 +56,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES mel_amcl_sensors mel_amcl_map mel_amcl_pf
 )
+
 
 include_directories(include)
 include_directories(${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
@@ -114,6 +122,11 @@ install(DIRECTORY include/mel_amcl/
 
 install(DIRECTORY examples/
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/examples
+)
+
+catkin_install_python(PROGRAMS
+    scripts/gnss_fence.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 

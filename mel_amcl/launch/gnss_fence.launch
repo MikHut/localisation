@@ -2,10 +2,12 @@
 <launch>
 
   <arg name="site_name" default="riseholme_sim" />
-  
+  <arg name="visualise_site_on_google" default="true"/>
+
   <rosparam file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" command="load"/>
   
   <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen">  
+      <param name="visualise_site_on_google" value="$(arg visualise_site_on_google)"/>
   </node>
 
 

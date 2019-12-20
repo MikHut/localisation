@@ -5,7 +5,7 @@
 
   <rosparam file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" command="load"/>
   
-  <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen">  
+  <node pkg="mel_amcl" type="check_site_setup.py" name="check_site_setup" output="screen">  
   </node>
 
 

@@ -39,15 +39,16 @@
     <depend>tf2</depend>
     <depend>tf2_msgs</depend>
     <depend>tf2_ros</depend>
-    <depend>mapviz</depend>
-    <depend>mapviz_plugins</depend>
 
     <exec_depend>robot_localization</exec_depend>
     <exec_depend>gmapping</exec_depend>
     <exec_depend>python-shapely</exec_depend>
     <exec_depend>python-matplotlib</exec_depend>
-    <exec_depend>python-utm</exec_depend>
-
+    <exec_depend>python-utm-pip</exec_depend>
+    <exec_depend>docker.io</exec_depend>
+    <exec_depend>mapviz</exec_depend>
+    <exec_depend>mapviz_plugins</exec_depend>
+    <exec_depend>tile_map</exec_depend>
 
     <test_depend>map_server</test_depend>
     <test_depend>rostest</test_depend>

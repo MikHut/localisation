@@ -20,8 +20,14 @@ class CheckSiteSetup():
 
     def __init__(self):
 
+
+
         self.site_datum = rospy.get_param("navsat_transform_node/datum")
         print 'site datum: ', self.site_datum
+
+
+        self.api_key = rospy.get_param("~api_key")
+
 
         self.gnss_fence_coords = rospy.get_param("gnss_fence/gnss_fence_coords")
 
@@ -78,7 +84,7 @@ class CheckSiteSetup():
 
 
         gmap = gmplot.GoogleMapPlotter(self.site_datum[0], 
-                            self.site_datum[1], 18, apikey="AIzaSyCPlq11AxZ9LYGbKL97YsQOTp-90A97Tko")  
+                            self.site_datum[1], 18, apikey=self.api_key)  
 
         
         datum_utm_east, datum_utm_north, zone_num, zone_let = utm.from_latlon(self.site_datum[0], self.site_datum[1])

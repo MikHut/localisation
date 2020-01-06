@@ -1,11 +1,14 @@
 <?xml version="1.0" ?>
 <launch>
 
+  <arg name="api_key" default="" />
+
   <arg name="site_name" default="riseholme_sim" />
 
   <rosparam file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" command="load"/>
   
-  <node pkg="mel_amcl" type="check_site_setup.py" name="check_site_setup" output="screen">  
+  <node pkg="mel_amcl" type="check_site_setup.py" name="check_site_setup" output="screen">
+    <param name="api_key" value="$(arg api_key)" />  
   </node>
 
 

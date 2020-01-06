@@ -12,14 +12,14 @@ from nav_msgs.msg import Odometry
 import tf
 from geometry_msgs.msg import Quaternion
 import rospy
-from math import pi
+from math import pi, sqrt
 
 class GpsMask:
     
     def __init__(self):
 
-        self.gps_error_mask = rospy.get_param('~gps_error_mask', 0.01)
-
+        self.gps_error_mask_std = rospy.get_param('~gps_error_mask_std', 0.1)
+        self.gps_error_mask_cov = self.gps_error_mask_std**2
         
         self.gps_error_x = 0
         self.gps_error_y = 0
@@ -31,27 +31,29 @@ class GpsMask:
         rospy.Subscriber('/odometry/gps', Odometry, self.odom_callback, queue_size = 10)
         rospy.Subscriber('/yaw', Imu, self.yaw_callback, queue_size = 10)
 
+
+
     def odom_callback(self, data):
         self.gps_error_x = data.pose.covariance[0]
         self.gps_error_y = data.pose.covariance[7]
 
-        if (self.gps_error_x < self.gps_error_mask) and (self.gps_error_y <self.gps_error_mask):
+        if (self.gps_error_x < self.gps_error_mask_cov) and (self.gps_error_y <self.gps_error_mask_cov):
             self.odom_repub.publish(data)
         else:
-            rospy.logwarn("GPS error too high (x=%d, y=%d), masking. ", self.gps_error_x, self.gps_error_y)
+            rospy.logwarn("GPS error too high (x=%s, y=%s), masking. ", sqrt(self.gps_error_x), sqrt(self.gps_error_y))
+
 
 
     def yaw_callback(self, data):
     
-        if (self.gps_error_x < self.gps_error_mask and self.gps_error_y <self.gps_error_mask):
+        if (self.gps_error_x < self.gps_error_mask_cov and self.gps_error_y <self.gps_error_mask_cov):
             self.yaw_repub.publish(data)
             
 
-    
 
-def main():
-    
-    rospy.init_node('gps_maks', anonymous=True)
+
+if __name__ == '__main__':
+    rospy.init_node('gps_mask', anonymous=True)
     GpsMask()
     try:
         rospy.spin()
@@ -59,7 +61,3 @@ def main():
         print "End gps mask module"
     
 
-
-
-if __name__ == '__main__':
-    main()

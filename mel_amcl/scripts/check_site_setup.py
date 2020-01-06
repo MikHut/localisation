@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 
+"""
+This script loads site specific data from a datum file, specified via site_name, and visualises
+it on google maps to check the setup is correct. (A google maps api key is required)
+
+Checks include  - does the field match the site name?
+                - do the map bounds (for gmapping) cover the field of interest?
+                - is the gnss fence correct?
+                - is the datum roughly near the center of the field of interest?
+                
+
+"""
+
+
 import rospy
 
 import matplotlib.pyplot as plt
@@ -115,6 +128,6 @@ class CheckSiteSetup():
 
 
 if __name__ == '__main__':
-    rospy.init_node('CheckSiteSetup')
-    server = CheckSiteSetup()
+    rospy.init_node('check_site_setup')
+    CheckSiteSetup()
     rospy.spin()

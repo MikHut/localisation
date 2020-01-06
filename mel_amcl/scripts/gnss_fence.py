@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+This script subscibes to a NavSatFix message and checks that the robot is within a polygon defined by a set of coordinates.
+
+It publishes true on /gnss_fence/status_within if the robot is within the boundary.
+
+"""
+
+
 import rospy
 
 import matplotlib.pyplot as plt
@@ -85,7 +93,8 @@ class GNSS_fence:
 
 
 
+
 if __name__ == '__main__':
     rospy.init_node('gnss_fence')
-    server = GNSS_fence()
+    GNSS_fence()
     rospy.spin()

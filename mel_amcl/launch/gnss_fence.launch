@@ -1,4 +1,5 @@
 <?xml version="1.0" ?>
+
 <launch>
 
   <arg name="site_name" default="riseholme_sim" />
@@ -7,6 +8,5 @@
   
   <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen">  
   </node>
-
 
 </launch>

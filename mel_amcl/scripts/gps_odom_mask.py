@@ -4,6 +4,10 @@
 Created on Mon Aug 12 15:24:44 2019
 
 @author: michael
+
+This script subscribes to a GPS odometry message and re publishes it if the error is within a specified threshold (mask).
+It is found to ignore high error GPS data during mapping is better than fusing it.
+
 """
 
 from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -25,7 +29,6 @@ class GpsMask:
         self.gps_error_y = 0
 
         self.odom_repub = rospy.Publisher('/odometry/gps/mask', Odometry, queue_size=10)
-
         self.yaw_repub = rospy.Publisher('/yaw/mask', Imu, queue_size=10)
         
         rospy.Subscriber('/odometry/gps', Odometry, self.odom_callback, queue_size = 10)
@@ -34,6 +37,7 @@ class GpsMask:
 
 
     def odom_callback(self, data):
+
         self.gps_error_x = data.pose.covariance[0]
         self.gps_error_y = data.pose.covariance[7]
 
@@ -59,5 +63,3 @@ if __name__ == '__main__':
         rospy.spin()
     except KeyboardInterrupt:
         print "End gps mask module"
-    
-

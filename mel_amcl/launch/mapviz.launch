@@ -2,10 +2,12 @@
 
   <arg name="site_name" default="riseholme" />
 
+  <arg name="node_start_delay" default="3.0" />  
+
   <node pkg="mel_amcl" type="run_mapproxy.sh" name="mapproxy"></node>
 
 
-  <node pkg="mapviz" type="mapviz" name="mapviz"></node>
+  <node pkg="mapviz" type="mapviz" name="mapviz" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@'"/>
 
   <rosparam file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" command="load"/>
   
@@ -14,7 +16,7 @@
     <param name="local_xy_origin" value="dont_change_this"/>
   </node>
 
-  <node pkg="tf" type="static_transform_publisher" name="swri_transform" args="0 0 0 0 0 0 /map /origin 100"  />
+  <node pkg="tf" type="static_transform_publisher" name="swri_transform" args="0 0 0 0 0 0 /map /origin 100" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@'" />
 
 
 

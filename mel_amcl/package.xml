@@ -44,7 +44,6 @@
     <exec_depend>gmapping</exec_depend>
     <exec_depend>python-shapely</exec_depend>
     <exec_depend>python-matplotlib</exec_depend>
-    <exec_depend>python-utm-pip</exec_depend>
     <exec_depend>docker.io</exec_depend>
     <exec_depend>mapviz</exec_depend>
     <exec_depend>mapviz_plugins</exec_depend>

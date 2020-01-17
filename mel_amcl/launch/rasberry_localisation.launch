@@ -15,9 +15,7 @@
   <arg name="gps_additional_yaw_std" default="0.4" />
 
   <arg name="use_gnss_fence" default="false"/>
-  <arg name="visualise_site_on_google" default="false"/>
   
-
 
   <!-- launch amcl but dont publish map->odom tf as this is handled by ekf_se_map -->
   <include file="$(find mel_amcl)/launch/mel_amcl.launch" unless="$(arg use_gps_only)">
@@ -46,7 +44,6 @@
 
   <!-- Use GNSS fence for safety and checking for a single utm zone-->
   <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen"  if="$(arg use_gnss_fence)" >
-      <param name="visualise_site_on_google" value="$(arg visualise_site_on_google)"/>
   </node>
 
 

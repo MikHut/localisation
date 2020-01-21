@@ -1471,10 +1471,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       pdata.pose_std.v[0] = std::max(last_received_gps_raw_std.v[0], last_received_gps_std.v[0]);
       pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]); 
       pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]);
-  
-      pdata.additional_pose_std = additional_pose_std_;
-      pdata.additional_yaw_std = additional_yaw_std_;
-      pdata.use_ekf_yaw = use_ekf_yaw;
       
       ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
       ROS_INFO("GPS age: %f seconds. Std: x= %f, y= %f meters",
@@ -1488,6 +1484,9 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           pdata_factored.pose_std.v[0] = pdata.pose_std.v[0] * pose_error_factor;
           pdata_factored.pose_std.v[1] = pdata.pose_std.v[1] * pose_error_factor;
           pdata_factored.pose_std.v[2] = pdata.pose_std.v[2] * pose_error_factor;
+          pdata_factored.additional_pose_std = additional_pose_std_;
+          pdata_factored.additional_yaw_std = additional_yaw_std_;
+          pdata_factored.use_ekf_yaw = use_ekf_yaw;
           pose_->UpdateSensor(pf_, (AMCLSensorData*)&pdata_factored);
         }
         else

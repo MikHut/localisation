@@ -9,15 +9,21 @@
 
 
   <!-- Play rosbag -->
-  <arg name="path" default="$(find mel_amcl)/bag_data/map_frame/clockhouse/" />
+  <!-- <arg name="path" default="$(find mel_amcl)/bag_data/map_frame/clockhouse/" /> -->
   <!-- <arg name="path" default="/home/michael/Documents/Saga\ start/Localisation/" /> -->
-  <arg name="file_name" default="clockhouse_west.bag" />
+  <!-- <arg name="file_name" default="clockhouse_west.bag" /> -->
+    <arg name="path" default="$(find mel_amcl)/bag_data/map_frame/clockhouse/" />
+  <!-- <arg name="path" default="/home/michael/Documents/Saga\ start/Localisation/" /> -->
+  <!-- <arg name="file_name" default="tall_robot_data_2019-08-14-12-48-50.bag" /> -->
+  <arg name="file_name" default="clockhouse_strawgate.bag" />
   <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg path)$(arg file_name)
-   -r 10 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan"/>
+   -r 20 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan"/>
   
 
   <!-- Load rtk map -->
-  <arg name="map_file" default="$(find mel_amcl)/maps/clockhouse/clockhouse_west.yaml"/>
+  <!-- <arg name="map_file" default="$(find mel_amcl)/maps/clockhouse/clockhouse_strawgate-draft2.yaml"/> -->
+  <arg name="map_file" default="$(find rasberry_navigation)/maps/clockhouse/clockhouse_strawgate-draft2.yaml"/>
+
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
  
 

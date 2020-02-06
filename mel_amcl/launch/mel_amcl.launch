@@ -11,6 +11,9 @@
 
   <arg name="use_gps" default="true"/>
   <arg name="use_gps_odom" default="true"/>
+  <arg name="gps_mask_std" default="0.14" />
+  <arg name="gps_additional_pose_std" default="0.6" />
+  <arg name="gps_additional_yaw_std" default="0.4" />
 
   <arg name="use_omni" default="true" />
 
@@ -31,7 +34,12 @@
     <!-- GPS parameters -->
     <param name="use_gps" value="$(arg use_gps)"/>
     <param name="use_gps_odom" value="$(arg use_gps_odom)"/>
-
+    <!-- <param name="gps_mask_std" value="5.0"/>
+    <param name="gps_additional_pose_std" value="3.0"/>
+    <param name="gps_additional_yaw_std" value="1.0"/> -->
+    <param name="gps_mask_std" value="$(arg gps_mask_std)"/>
+    <param name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)"/>
+    <param name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)"/>
 
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>
@@ -74,11 +82,11 @@
 	<!-- odometry model -->
     <param name="odom_model_type" value="omni-corrected" if="$(arg use_omni)"/>
     <param name="odom_model_type" value="diff-corrected" unless="$(arg use_omni)"/>
-    <param name="odom_alpha1" value="0.08"/> <!-- 0.014 -->
-    <param name="odom_alpha2" value="0.08"/>
-    <param name="odom_alpha3" value="0.08"/>
-    <param name="odom_alpha4" value="0.08"/>
-    <param name="odom_alpha5" value="0.08"/>
+    <param name="odom_alpha1" value="0.04"/> <!-- 0.014 -->
+    <param name="odom_alpha2" value="0.04"/>
+    <param name="odom_alpha3" value="0.04"/>
+    <param name="odom_alpha4" value="0.04"/>
+    <param name="odom_alpha5" value="0.04"/>
     <param name="odom_frame_id" value="odom"/>
     <param name="base_frame_id" value="base_link"/>
     <param name="global_frame_id" value="map" />

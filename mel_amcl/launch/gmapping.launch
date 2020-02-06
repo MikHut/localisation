@@ -3,8 +3,17 @@
 
   <!-- <param name="/use_sim_time" value="true"/> -->
 
+  <!-- <arg name="xmin" default="-100.0"/> -->
+  <!-- <arg name="ymin" default="-100.0"/> -->
+  <!-- <arg name="xmax" default="100.0"/> -->
+  <!-- <arg name="ymax" default="100.0"/> -->
 
-  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+  <arg name="site_name" default="riseholme" />
+
+
+  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />
+
+  <node pkg="gmapping" type="slam_gmapping" name="gmapping" output="screen">
     <param name="base_frame" value="base_link"/>
     <param name="odom_frame" value="odom"/>
     <param name="map_update_interval" value="5.0"/>
@@ -30,10 +39,10 @@
     <param name="particles" value="80"/>
 
 
-    <param name="xmin" value="-100.0"/>
-    <param name="ymin" value="-100.0"/>
-    <param name="xmax" value="100.0"/>
-    <param name="ymax" value="100.0"/>
+    <!-- <param name="xmin" value="$(arg xmin)"/> -->
+    <!-- <param name="ymin" value="$(arg ymin)"/> -->
+    <!-- <param name="xmax" value="$(arg xmax)"/> -->
+    <!-- <param name="ymax" value="$(arg ymax)"/> -->
     <param name="delta" value="0.05"/>
 
 

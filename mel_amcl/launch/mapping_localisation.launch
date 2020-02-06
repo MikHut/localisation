@@ -3,29 +3,34 @@
 <launch>
   
   <arg name="site_name" default="riseholme" />
-  <arg name="gps_error_mask" default="0.01" />
+  <arg name="gps_error_mask_std" default="0.1" />
 
   <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
 
+
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
-    <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
+    <!-- Input remapping -->
     <remap from="imu/data" to="yaw"/> 
     <remap from="odometry/filtered" to="odometry/gps"/>
     <remap from="gps/fix" to="gps/fix"/>
+    <!-- Output remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
   </node>
 
 
-  <!-- GPS mask for high error data -->
+  <!-- GPS mask for high error data (we tend to be better off just ignoring it) -->
   <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true">
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
-    <param name="gps_error_mask" value="$(arg gps_error_mask)"/>
+    <param name="gps_error_mask_std" value="$(arg gps_error_mask_std)"/>
   </node>
 
-  <!-- load parameters for eKFs: odom, map and separate gps -->
+
+  <!-- load parameters for eKF -->
   <rosparam command="load" file="$(find mel_amcl)/config/mapping_with_rtk.yaml" />
 
-  <!-- eKF for the odom frame using gps -->
+
+  <!-- eKF for the odom frame using gps - we only use odom frame for mapping - but use GPS data. 
+       Gmapping makes map frame - But should equal odom!!!. -->
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_local" clear_params="true">
     <remap from="odometry/filtered" to="odometry/gps"/>
     <remap from="odometry/gps" to="odometry/gps/mask"/>

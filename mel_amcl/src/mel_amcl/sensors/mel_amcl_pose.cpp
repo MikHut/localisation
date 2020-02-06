@@ -77,7 +77,7 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
   }
 
   //ROS_INFO("Additional pose cov %f, yaw cov %f, input pose cov %f, input yaw cov %f, fuse pose cov %f, yaw cov %f.", data->additional_pose_std,
-    additional_yaw_cov, pow(data->pose_std.v[0],2), pow(data->pose_std.v[2],2), pose_cov, yaw_cov);
+    //additional_yaw_cov, pow(data->pose_std.v[0],2), pow(data->pose_std.v[2],2), pose_cov, yaw_cov);
 
 
 

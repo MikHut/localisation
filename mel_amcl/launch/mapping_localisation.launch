@@ -3,9 +3,11 @@
 <launch>
   
   <arg name="site_name" default="riseholme" />
+  <arg name="datum_file" default=""/>
+
   <arg name="gps_error_mask_std" default="0.1" />
 
-  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
+  <rosparam command="load" file="$(arg datum_file)" />
 
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">

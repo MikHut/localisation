@@ -3,6 +3,7 @@
 <launch>
 
   <arg name="site_name" default="riseholme" />
+  <arg name="datum_file" default=""/>
 
   <arg name="ekf_publish_tf" default="true" />
   <arg name="use_gps_only" default="false" />
@@ -29,7 +30,7 @@
 
 
 
-  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />
+  <rosparam command="load" file="$(arg datum_file)" />
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">     
       <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->

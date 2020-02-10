@@ -5,7 +5,8 @@
 
   <param name="/use_sim_time" value="true"/>
 
-  <arg name="datum_file" default=""/>
+  <arg name="site_name" default="riseholme"/>
+  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
 
   <!-- Play rosbag -->

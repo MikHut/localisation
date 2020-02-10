@@ -1,6 +1,7 @@
 <launch>
 
-  <arg name="datum_file" default=""/>
+  <arg name="site_name" default="riseholme"/>
+  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
   <node pkg="mel_amcl" type="run_mapproxy.sh" name="mapproxy"></node>
 

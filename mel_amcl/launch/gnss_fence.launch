@@ -3,8 +3,9 @@
 <launch>
 
   <arg name="site_name" default="riseholme_sim" />
+  <arg name="datum_file" default=""/>
 
-  <rosparam file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" command="load"/>
+  <rosparam command="load" file="$(arg datum_file)" />  
   
   <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen">  
   </node>

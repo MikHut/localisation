@@ -8,7 +8,6 @@
   <!-- <arg name="xmax" default="100.0"/> -->
   <!-- <arg name="ymax" default="100.0"/> -->
 
-  <arg name="site_name" default="riseholme" />
   <arg name="datum_file" default=""/>
 
 

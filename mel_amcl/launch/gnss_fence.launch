@@ -2,7 +2,6 @@
 
 <launch>
 
-  <arg name="site_name" default="riseholme_sim" />
   <arg name="datum_file" default=""/>
 
   <rosparam command="load" file="$(arg datum_file)" />  

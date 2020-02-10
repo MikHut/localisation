@@ -2,7 +2,6 @@
 
 <launch>
 
-  <arg name="site_name" default="riseholme" />
   <arg name="datum_file" default=""/>
 
   <arg name="ekf_publish_tf" default="true" />

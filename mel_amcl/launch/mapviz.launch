@@ -1,6 +1,5 @@
 <launch>
 
-  <arg name="site_name" default="riseholme" />
   <arg name="datum_file" default=""/>
 
   <node pkg="mel_amcl" type="run_mapproxy.sh" name="mapproxy"></node>
@@ -10,7 +9,7 @@
 
   <rosparam command="load" file="$(arg datum_file)" />  
 
-  
+
   <node pkg="swri_transform_util" type="initialize_origin.py" name="mapviz_initialize_origin" >
     <param name="local_xy_frame" value="/map"/>
     <param name="local_xy_origin" value="dont_change_this"/>

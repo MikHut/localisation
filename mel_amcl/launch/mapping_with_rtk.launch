@@ -3,7 +3,6 @@
 <launch>
 
 
-  <arg name="site_name" default="riseholme" />
   <arg name="datum_file" default=""/>
   
 
@@ -67,7 +66,7 @@
 
   <!-- mapviz -->
   <include file="$(find mel_amcl)/launch/mapviz.launch">
-    <arg name="site_name" value="$(arg site_name)" />
+    <arg name="datum_file" value="$(arg datum_file)" />
   </include>
 
 </launch>

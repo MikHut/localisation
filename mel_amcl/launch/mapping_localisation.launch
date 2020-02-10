@@ -2,7 +2,6 @@
 
 <launch>
   
-  <arg name="site_name" default="riseholme" />
   <arg name="datum_file" default=""/>
 
   <arg name="gps_error_mask_std" default="0.1" />

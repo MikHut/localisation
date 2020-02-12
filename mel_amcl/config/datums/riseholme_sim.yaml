@@ -2,7 +2,7 @@
 # Define site datum - best to be in the center of the field of interest
 datum_latitude: &datum_latitude 53.2686053
 datum_longitude: &datum_longitude -0.524217
-datum_heading: &datum_heading 0.0 #178.4575 #4.86
+datum_heading: &datum_heading 4.86 #178.4575 #4.86
 
 
 # Define GNSS Fence coordinates [lat, lon]
@@ -37,5 +37,5 @@ navsat_transform_node:
   publish_filtered_gps: true
   use_odometry_yaw: false
   wait_for_datum: true
-  datum: [ *datum_latitude, *datum_longitude, 0.0]
+  datum: [ *datum_latitude, *datum_longitude, *datum_heading]
   

@@ -1718,13 +1718,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         localisation_discrepancy.data = pose_discrepancy;
         localisation_discrepancy_pub.publish(localisation_discrepancy);
 
+        ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_; 
         int mel_status = 0;
         std_msgs::Int8 mel_status_msg;
-        if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0] && weight_amcl_from_scan > scan_match_thresholds[1])
+        if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0] && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 6;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 5;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
             mel_status = 4;
         else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 3;
@@ -1738,8 +1739,8 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);
 
-
-        if (pose_discrepancy > 10+gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
+         
+        if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
         {
               ROS_WARN("Resetting AMCL pose due to pose discepancy");
               // reinitialise particle filter with the gps data
@@ -1747,31 +1748,30 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
               degraded_amcl_localisation_counter = 0;
         }
 
-        bool reset_pose = false;
-        if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std)
-        {
-          degraded_amcl_localisation_counter++;
+        // bool reset_pose = false;
+        // if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std && pose_discrepancy > 0.2 + 4*gps_mask_std)
+        // {
+        //   degraded_amcl_localisation_counter++;
 
-          if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
-              reset_pose = true;
+        //   if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
+        //       reset_pose = true;
 
-          if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-            reset_pose = true;
+        //   if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
+        //     reset_pose = true;
 
-          if (reset_pose)
-          {
-            ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
-            // reinitialise particle filter with the gps data
-            handleInitialPoseMessage(last_received_gps_msg);
-            degraded_amcl_localisation_counter = 0;
-          }
+        //   if (reset_pose)
+        //   {
+        //     ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
+        //     // reinitialise particle filter with the gps data
+        //     handleInitialPoseMessage(last_received_gps_msg);
+        //     degraded_amcl_localisation_counter = 0;
+        //   }
 
-        }
-
-        else
-        {
-          degraded_amcl_localisation_counter = 0;
-        }
+        // }
+        // else
+        // {
+        //   degraded_amcl_localisation_counter = 0;
+        // }
 
       }
     }

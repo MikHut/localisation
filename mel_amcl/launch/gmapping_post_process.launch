@@ -3,10 +3,10 @@
 
   <param name="/use_sim_time" value="true"/>
 
-  <arg name="site_name" default="riseholme" />
+  <arg name="site_name" default="riseholme"/>
+  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
-
-  <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />
+  <rosparam command="load" file="$(arg datum_file)" />  
 
   <node pkg="gmapping" type="slam_gmapping" name="gmapping" output="screen">
     <param name="base_frame" value="base_link"/>

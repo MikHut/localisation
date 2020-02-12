@@ -3,8 +3,9 @@
 <launch>
 
 
-  <arg name="site_name" default="riseholme" />
-
+  <arg name="site_name" default="riseholme"/>
+  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
+  
 
   <param name="/use_sim_time" value="true"/>
 
@@ -27,10 +28,12 @@
   <!-- this might be neccessary to make yaw enu format -->
   <!-- <node pkg="mel_amcl" type="yaw_republisher.py" name="yaw_republisher" clear_params="true">
   </node> -->
+
+
+  <rosparam command="load" file="$(arg datum_file)" />  
   
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
-    <rosparam command="load" file="$(find mel_amcl)/config/datums/$(arg site_name).yaml" />      
     <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
     <remap from="imu/data" to="yaw"/> 
     <remap from="odometry/filtered" to="odometry/gps"/>
@@ -64,7 +67,7 @@
 
   <!-- mapviz -->
   <include file="$(find mel_amcl)/launch/mapviz.launch">
-    <arg name="site_name" value="$(arg site_name)" />
+    <arg name="datum_file" value="$(arg datum_file)" />
   </include>
 
 </launch>

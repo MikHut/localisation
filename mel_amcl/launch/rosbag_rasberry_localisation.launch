@@ -4,7 +4,8 @@
 
   <param name="/use_sim_time" value="true"/>
 
-  <arg name="site_name" default="clockhouse" />
+  <arg name="site_name" default="riseholme"/>
+  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
   <arg name="ekf_publish_tf" default="true" />
   <arg name="use_gps_only" default="false" />
@@ -48,6 +49,32 @@
     <arg name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)" />
   </include>
 
+
+  <rosparam command="load" file="$(arg datum_file)" />  
+
+  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" if="$(arg use_gps)">     
+      <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
+      <remap from="imu/data" to="yaw"/> 
+      <remap from="odometry/filtered" to="odometry/gps"/>
+      <remap from="gps/fix" to="gps/fix"/>
+      <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+  </node>
+
+
+
+  <!-- load parameters for eKFs: odom, and separate gps -->
+  <rosparam command="load" file="$(find mel_amcl)/config/rasberry_localisation.yaml" />
+
+  <!-- eKF for the odom frame -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_local" clear_params="true" if="$(arg ekf_publish_tf)">
+    <!-- <remap from="odometry/filtered" to="rl/odom"/> -->
+  </node>
+
+
+  <!-- eKF for the gps in map frame, to use output, set use_gps_odom arg in mel_amcl to true --> 
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps" clear_params="true" if="$(arg use_gps)">
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node> 
 
   <!-- rviz -->
   <node pkg="rviz" type="rviz" name="rviz"/>

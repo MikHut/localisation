@@ -46,13 +46,47 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
   pf_sample_t *sample;
   pf_vector_t pose;
   double angle_error;
+  double pose_cov;
+  double yaw_cov;
+  double euclidean_distance_sqared;
+  double euclidean_p;
+  double euclidean_denom;
+  double yaw_denom;
+
   total_weight = 0.0;
 
 
-  double additional_pose_std = data->additional_pose_std;
-  double additional_yaw_std = data->additional_yaw_std;
+  double additional_pose_cov = pow(data->additional_pose_std,2);
+  double additional_yaw_cov = pow(data->additional_yaw_std,2);
+
+  // To be conservative choose the largest reported error from GNSS receiver
+  // To avoid multiple calculations in loop - get total cov now
+  if (data->pose_std.v[0] > data->pose_std.v[1])
+  {
+    pose_cov = pow(data->pose_std.v[0],2) + additional_pose_cov;
+  }
+  else
+  {
+    pose_cov = pow(data->pose_std.v[1],2) + additional_pose_cov;
+  }
+  
+  // To avoid multiple calculations in loop - get total cov now
+  if (data->use_ekf_yaw)
+  {
+    yaw_cov = pow(data->pose_std.v[2],2) + additional_yaw_cov;
+  }
+
+  //ROS_INFO("Additional pose cov %f, yaw cov %f, input pose cov %f, input yaw cov %f, fuse pose cov %f, yaw cov %f.", data->additional_pose_std,
+    //additional_yaw_cov, pow(data->pose_std.v[0],2), pow(data->pose_std.v[2],2), pose_cov, yaw_cov);
+
+
+
+  // Precomputing values where possible 
+  euclidean_denom = sqrt(2 * M_PI * pose_cov);
+  yaw_denom = sqrt(2 * M_PI * yaw_cov);
 
   
+
   // Compute the sample weights
   for (j = 0; j < set->sample_count; j++)
   {
@@ -61,23 +95,32 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
     sample = set->samples + j;
     pose = sample->pose;
 
-    // use gps positions and covariances separately or combine to distance from pose?
-    // are the gps data covariance in the correct frame - check navsat output
-    // need to get gps data inc covariances into this function
 
-    angle_error = fmod(pose.v[2] - data->pose.v[2] + M_PI, 2*M_PI);
-    if (angle_error < 0)
+    euclidean_distance_sqared = pow(pose.v[0] - data->pose.v[0],2) + pow(pose.v[1] - data->pose.v[1],2);
+
+    euclidean_p = exp(-0.5 * (euclidean_distance_sqared / pose_cov) ) / euclidean_denom;
+    
+
+    if (data->use_ekf_yaw)
+    {
+      angle_error = fmod(pose.v[2] - data->pose.v[2] + M_PI, 2*M_PI);
+
+      if (angle_error < 0)
+      {
         angle_error += 2*M_PI;
-    angle_error -= M_PI;
+      }
 
+      angle_error -= M_PI;
+      
+      double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / yaw_cov)) / yaw_denom;
+      p = euclidean_p*yaw_p;
+    }
+    else
+    {
+      p = euclidean_p;
+    }
 
-    double x_p =  exp(-0.5 * (pow((pose.v[0] - data->pose.v[0]), 2) / (pow(data->pose_std.v[0],2)+pow(additional_pose_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[0],2)+pow(additional_pose_std,2)));
-    double y_p =  exp(-0.5 * (pow((pose.v[1] - data->pose.v[1]), 2) / (pow(data->pose_std.v[1],2)+pow(additional_pose_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[1],2)+pow(additional_pose_std,2)));
-    double yaw_p =  exp(-0.5 * (pow(angle_error, 2) / (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)))) / sqrt(2 * M_PI * (pow(data->pose_std.v[2],2)+pow(additional_yaw_std,2)));
-    //double num = exp(-0.5 * (pow((pose.v[0] - data->pose.v[0]), 2) / (data->pose_covariance.v[0]+additional_pose_covariance) + pow((pose.v[1] - data->pose.v[1]), 2) / (data->pose_covariance.v[1]+additional_pose_covariance) + pow(angle_error, 2) / (data->pose_covariance.v[2]+additional_yaw_covariance) ));
-    //double denom = sqrt(2 * M_PI * (data->pose_covariance.v[0]+additional_pose_covariance) * (data->pose_covariance.v[1]+additional_pose_covariance) * (data->pose_covariance.v[2]+additional_yaw_covariance));
-    //p = num/denom;
-    p = x_p*y_p*yaw_p;
+   
     //assert(p <= 1.0);
     //assert(p >= 0.0);
     

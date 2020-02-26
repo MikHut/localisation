@@ -2,9 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
     <name>mel_amcl</name>
-    <version>1.16.2</version>
+    <version>2.0</version>
     <description>
         <p>
+            Modified AMCL code to incorporate pose and/or odometry measurements.
             amcl is a probabilistic localization system for a robot moving in
             2D. It implements the adaptive (or KLD-sampling) Monte Carlo
             localization approach (as described by Dieter Fox), which uses a
@@ -18,9 +19,7 @@
     <url>http://wiki.ros.org/amcl</url>
     <author>Brian P. Gerkey</author>
     <author>contradict@gmail.com</author>
-    <maintainer email="davidvlu@gmail.com">David V. Lu!!</maintainer>
-    <maintainer email="mfergs7@gmail.com">Michael Ferguson</maintainer>
-    <maintainer email="ahoy@fetchrobotics.com">Aaron Hoy</maintainer>
+    <maintainer email="mhutchinson@sagarobotics.com">Michael Hutchinson</maintainer>
     <license>LGPL</license>
 
     <buildtool_depend>catkin</buildtool_depend>

@@ -8,7 +8,10 @@
   <node pkg="mel_amcl" type="run_mapproxy.sh" name="mapproxy"></node>
 
 
-  <node pkg="mapviz" type="mapviz" name="mapviz" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@'"/>
+  <node pkg="mapviz" type="mapviz" name="mapviz" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@'">
+    <param name="config" value="$(find mel_amcl)/config/mapviz_config"/>
+  </node>
+
 
   <rosparam command="load" file="$(arg datum_file)" />  
 

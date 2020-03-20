@@ -237,7 +237,7 @@ private:
   double pose_error_factor;
   bool filter_scan_by_range;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
-  int degraded_amcl_localisation_count_max = 8;
+  int degraded_amcl_localisation_count_max = 3;
   int degraded_amcl_localisation_counter = 0;
   // mel health parameters
   bool publish_mel_health_;
@@ -1739,13 +1739,17 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);
 
-         
         if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
+          degraded_amcl_localisation_counter++;
+        else
+          degraded_amcl_localisation_counter = 0;
+
+        
+        if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
         {
-              ROS_WARN("Resetting AMCL pose due to pose discepancy");
-              // reinitialise particle filter with the gps data
-              handleInitialPoseMessage(last_received_gps_msg);
-              degraded_amcl_localisation_counter = 0;
+          ROS_WARN("Resetting AMCL pose due to pose discepancy");
+          handleInitialPoseMessage(last_received_gps_msg);
+          degraded_amcl_localisation_counter = 0;
         }
 
         // bool reset_pose = false;

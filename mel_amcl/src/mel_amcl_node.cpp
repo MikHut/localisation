@@ -1594,7 +1594,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           j++;
         }
       }
-      ldata.range_count = j+1;
+      ldata.range_count = j;
     }
     else
     {

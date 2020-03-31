@@ -17,7 +17,7 @@ ekf_odom_2d:
 
 
   odom0: /odometry/base_raw
-  odom0_config: [false, false, true, # because we want 3D for roll/pitch but dont care about z
+  odom0_config: [false, false, true,
                  false, false, false,
                  true,  true,  false,
                  false, false, true,
@@ -44,7 +44,7 @@ ekf_odom_2d:
   # imu0_remove_gravitational_acceleration: true
 
 
-  # ordered as              x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+  # ordered as x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
   process_noise_covariance: [0.05, 0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0.05, 0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0,    0.05, 0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
@@ -112,7 +112,7 @@ ekf_map_2d:
 
 
   odom1: /odometry/base_raw
-  odom1_config: [false, false, false, # because we want 3D for roll/pitch but dont care about z
+  odom1_config: [false, false, false,
                  false, false, false,
                  true,  true,  false,
                  false, false, true,
@@ -154,7 +154,7 @@ ekf_map_2d:
 
   use_control: false
 
-
+  # ordered as x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
   process_noise_covariance: [0.05,  0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0.05,  0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0,    1e-3, 0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
@@ -171,7 +171,7 @@ ekf_map_2d:
                              0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    1e-3, 0,
                              0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    1e-3]
 
-
+  # ordered as x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
   initial_estimate_covariance: [50.0, 0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
                                 0,    50.0, 0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
                                 0,    0,    1e-9, 0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,

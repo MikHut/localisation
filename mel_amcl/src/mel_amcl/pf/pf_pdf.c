@@ -32,7 +32,7 @@
 //#include <gsl/gsl_rng.h>
 //#include <gsl/gsl_randist.h>
 
-#include "amcl/pf/pf_pdf.h"
+#include "mel_amcl/pf/pf_pdf.h"
 #include "portable_utils.hpp"
 
 // Random number generator seed value

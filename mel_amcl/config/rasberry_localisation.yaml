@@ -155,8 +155,8 @@ ekf_map_2d:
   use_control: false
 
   # ordered as x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
-  process_noise_covariance: [0.05,  0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
-                             0,    0.05,  0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+  process_noise_covariance: [0.1,  0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                             0,    0.1,  0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0,    1e-3, 0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0,    0,    1e-3, 0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
                              0,    0,    0,    0,    1e-3, 0,    0,     0,     0,    0,    0,    0,    0,    0,    0,

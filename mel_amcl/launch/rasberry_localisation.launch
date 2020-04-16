@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
-
 <launch>
 
   <arg name="site_name" default="riseholme"/>
@@ -8,19 +7,17 @@
   <arg name="ekf_publish_tf" default="true" />
   <arg name="use_gps_only" default="false" />
 
-  <arg name="use_omni" default="true" />
   <arg name="fuse_gps" default="true" />
   <arg name="gps_mask_std" default="0.14" />
-  <arg name="gps_additional_pose_std" default="0.6" />
+  <arg name="gps_additional_pose_std" default="0.4" />
   <arg name="use_ekf_yaw" default="true" />
   <arg name="gps_additional_yaw_std" default="0.4" />
 
   <arg name="use_gnss_fence" default="false"/>
   
 
-  <!-- launch amcl but dont publish map->odom tf as this is handled by ekf_se_map -->
+  <!-- launch mel_amcl for GPS and Lidar sensor fusion -->
   <include file="$(find mel_amcl)/launch/mel_amcl.launch" unless="$(arg use_gps_only)">
-      <!-- <arg name="use_omni" value="$(arg use_omni)" /> Dont pass this as I always want true! -->
       <arg name="use_gps" value="$(arg fuse_gps)" />
       <arg name="use_gps_odom" value="$(arg fuse_gps)" />
       <arg name="gps_mask_std" value="$(arg gps_mask_std)" />
@@ -30,10 +27,10 @@
   </include>
 
 
-
-
+  <!-- Load params from datum file which contains site details -->
   <rosparam command="load" file="$(arg datum_file)" />
 
+  <!-- launch navsat transform which uses the datum to transform lat/lon coords to the map frame -->
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">     
       <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
       <remap from="imu/data" to="yaw"/> 
@@ -44,28 +41,20 @@
 
 
   <!-- Use GNSS fence for safety and checking for a single utm zone-->
-  <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen"  if="$(arg use_gnss_fence)" >
-  </node>
+  <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen"  if="$(arg use_gnss_fence)"/>
 
 
-  <!-- load parameters for eKFs: odom, and separate gps -->
+  <!-- load parameters for eKFs: odom, and map -->
   <rosparam command="load" file="$(find mel_amcl)/config/rasberry_localisation.yaml" />
 
   <!-- eKF for the odom frame -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_local" clear_params="true" if="$(arg ekf_publish_tf)">
-    <!-- <remap from="odometry/filtered" to="rl/odom"/> -->
-  </node>
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_odom_2d" clear_params="true" if="$(arg ekf_publish_tf)"/>
 
 
-  <!-- eKF for the gps in map frame, to use output, set use_gps_odom arg in mel_amcl to true --> 
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps" clear_params="true" unless="$(arg use_gps_only)">
-    <remap from="odometry/filtered" to="odometry/gps"/>
+  <!-- eKF for the map frame - includes GPS data - can publish the map tf (instead of mel_amcl) if use_gps_only is true  --> 
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_2d" clear_params="true">
+    <param name="publish_tf" value="false" unless="$(arg use_gps_only)"/>
+    <remap from="odometry/filtered" to="odometry/gps"/>  
   </node> 
 
-  <!-- eKF for the gps in map frame which publishes the map frame tf instead of mel_amcl_node --> 
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_gps_only" clear_params="true" if="$(arg use_gps_only)">
-    <remap from="odometry/filtered" to="odometry/gps"/>
-  </node> 
-
-  
 </launch>

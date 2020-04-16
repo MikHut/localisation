@@ -148,8 +148,11 @@ public:
 
   /**
      * @brief Uses TF and LaserScan messages from bag file to drive AMCL instead
-     */
-  void runFromBag(const std::string &in_bag_fn);
+     * @param in_bag_fn input bagfile
+     * @param trigger_global_localization whether to trigger global localization
+     * before starting to process the bagfile
+  */
+  void runFromBag(const std::string &in_bag_fn, bool trigger_global_localization = false);
 
   int process();
   void savePoseToServer();
@@ -237,7 +240,7 @@ private:
   double pose_error_factor;
   bool filter_scan_by_range;
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
-  int degraded_amcl_localisation_count_max = 8;
+  int degraded_amcl_localisation_count_max = 3;
   int degraded_amcl_localisation_counter = 0;
   // mel health parameters
   bool publish_mel_health_;
@@ -340,6 +343,7 @@ private:
   double init_cov_[3];
   laser_model_t laser_model_type_;
   bool tf_broadcast_;
+  bool selective_resampling_;
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -347,8 +351,8 @@ private:
   ros::Time last_gps_msg_received_ts_;
   ros::Duration laser_check_interval_;
   ros::Duration gps_check_interval_;
-  void checkLaserReceived(const ros::TimerEvent &event);
-  void checkGPSReceived(const ros::TimerEvent &event);
+  void checkLaserReceived(const ros::TimerEvent& event);
+  void checkGPSReceived(const ros::TimerEvent& event);
 };
 
 std::vector<std::pair<int,int> > AmclNode::free_space_indices;
@@ -381,9 +385,16 @@ main(int argc, char** argv)
     // run using ROS input
     ros::spin();
   }
-  else if ((argc == 3) && (std::string(argv[1]) == "--run-from-bag"))
+  else if ((argc >= 3) && (std::string(argv[1]) == "--run-from-bag"))
   {
-    amcl_node_ptr->runFromBag(argv[2]);
+    if (argc == 3)
+    {
+      amcl_node_ptr->runFromBag(argv[2]);
+    }
+    else if ((argc == 4) && (std::string(argv[3]) == "--global-localization"))
+    {
+      amcl_node_ptr->runFromBag(argv[2], true);
+    }
   }
 
   // Without this, our boost locks are not shut down nicely
@@ -489,6 +500,7 @@ AmclNode::AmclNode() :
   private_nh_.param("base_frame_id", base_frame_id_, std::string("base_link"));
   private_nh_.param("global_frame_id", global_frame_id_, std::string("map"));
   private_nh_.param("resample_interval", resample_interval_, 2);
+  private_nh_.param("selective_resampling", selective_resampling_, false);
   double tmp_tol;
   private_nh_.param("transform_tolerance", tmp_tol, 0.1);
   private_nh_.param("recovery_alpha_slow", alpha_slow_, 0.001);
@@ -775,6 +787,11 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   beam_skip_distance_ = config.beam_skip_distance; 
   beam_skip_threshold_ = config.beam_skip_threshold; 
   
+  // Clear queued laser objects so that their parameters get updated
+  lasers_.clear();
+  lasers_update_.clear();
+  frame_to_laser_.clear();
+
   if( pf_ != NULL )
   {
     pf_free( pf_ );
@@ -784,6 +801,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
                  alpha_slow_, alpha_fast_,
                  (pf_init_model_fn_t)AmclNode::uniformPoseGenerator,
                  (void *)map_);
+  pf_set_selective_resampling(pf_, selective_resampling_);
   pf_err_ = config.kld_err; 
   pf_z_ = config.kld_z; 
   pf_->pop_err = pf_err_;
@@ -851,7 +869,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
 }
 
 
-void AmclNode::runFromBag(const std::string &in_bag_fn)
+void AmclNode::runFromBag(const std::string &in_bag_fn, bool trigger_global_localization)
 {
   rosbag::Bag bag;
   bag.open(in_bag_fn, rosbag::bagmode::Read);
@@ -882,6 +900,12 @@ void AmclNode::runFromBag(const std::string &in_bag_fn)
     }
     ROS_INFO("Waiting for map...");
     ros::getGlobalCallbackQueue()->callAvailable(ros::WallDuration(1.0));
+  }
+
+  if (trigger_global_localization)
+  {
+    std_srvs::Empty empty_srv;
+    globalLocalizationCallback(empty_srv.request, empty_srv.response);
   }
 
   BOOST_FOREACH(rosbag::MessageInstance const msg, view)
@@ -1115,6 +1139,7 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
                  alpha_slow_, alpha_fast_,
                  (pf_init_model_fn_t)AmclNode::uniformPoseGenerator,
                  (void *)map_);
+  pf_set_selective_resampling(pf_, selective_resampling_);
   pf_->pop_err = pf_err_;
   pf_->pop_z = pf_z_;
 
@@ -1569,7 +1594,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           j++;
         }
       }
-      ldata.range_count = j+1;
+      ldata.range_count = j;
     }
     else
     {
@@ -1718,13 +1743,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         localisation_discrepancy.data = pose_discrepancy;
         localisation_discrepancy_pub.publish(localisation_discrepancy);
 
+        ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_; 
         int mel_status = 0;
         std_msgs::Int8 mel_status_msg;
-        if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0] && weight_amcl_from_scan > scan_match_thresholds[1])
+        if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[0] && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 6;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 5;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
             mel_status = 4;
         else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 3;
@@ -1738,40 +1764,43 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);
 
-
-        if (pose_discrepancy > 10+gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std && weight_amcl_from_scan < 4)
-        {
-              ROS_WARN("Resetting AMCL pose due to pose discepancy");
-              // reinitialise particle filter with the gps data
-              handleInitialPoseMessage(last_received_gps_msg);
-              degraded_amcl_localisation_counter = 0;
-        }
-
-        bool reset_pose = false;
-        if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std)
-        {
+        if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
           degraded_amcl_localisation_counter++;
-
-          if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
-              reset_pose = true;
-
-          if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-            reset_pose = true;
-
-          if (reset_pose)
-          {
-            ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
-            // reinitialise particle filter with the gps data
-            handleInitialPoseMessage(last_received_gps_msg);
-            degraded_amcl_localisation_counter = 0;
-          }
-
-        }
-
         else
+          degraded_amcl_localisation_counter = 0;
+
+        
+        if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
         {
+          ROS_WARN("Resetting AMCL pose due to pose discepancy");
+          handleInitialPoseMessage(last_received_gps_msg);
           degraded_amcl_localisation_counter = 0;
         }
+
+        // bool reset_pose = false;
+        // if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std && pose_discrepancy > 0.2 + 4*gps_mask_std)
+        // {
+        //   degraded_amcl_localisation_counter++;
+
+        //   if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
+        //       reset_pose = true;
+
+        //   if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
+        //     reset_pose = true;
+
+        //   if (reset_pose)
+        //   {
+        //     ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
+        //     // reinitialise particle filter with the gps data
+        //     handleInitialPoseMessage(last_received_gps_msg);
+        //     degraded_amcl_localisation_counter = 0;
+        //   }
+
+        // }
+        // else
+        // {
+        //   degraded_amcl_localisation_counter = 0;
+        // }
 
       }
     }

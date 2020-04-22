@@ -1497,9 +1497,23 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]); 
       pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]);
       
-      ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
+      ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;
       ROS_INFO("GPS age: %f seconds. Std: x= %f, y= %f meters",
              d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);
+
+      // Resample the particles
+      if(!(++resample_count_ % resample_interval_) && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
+      {
+        ROS_WARN("JUMP UPDATE");
+        pf_matrix_t cov = pf_matrix_zero();
+        cov.m[0][0] = pow(pdata.pose_std.v[0],2);
+        cov.m[1][1] = pow(pdata.pose_std.v[1],2);
+        cov.m[2][2] = pow(pdata.pose_std.v[2],2);
+        pf_update_resample_jump(pf_, pdata.pose, cov);
+        resampled = true;
+      }
+
+
       if ( d < ros::Duration(0.2) )
       {
         if ( pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std )
@@ -1619,7 +1633,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     pf_odom_pose_ = pose;
 
     // Resample the particles
-    if(!(++resample_count_ % resample_interval_))
+    if(!(resample_count_ % resample_interval_) && !resampled) // ++resample_count
     {
       pf_update_resample(pf_);
       resampled = true;
@@ -1770,12 +1784,12 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           degraded_amcl_localisation_counter = 0;
 
         
-        if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-        {
-          ROS_WARN("Resetting AMCL pose due to pose discepancy");
-          handleInitialPoseMessage(last_received_gps_msg);
-          degraded_amcl_localisation_counter = 0;
-        }
+        // if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
+        // {
+        //   ROS_WARN("Resetting AMCL pose due to pose discepancy");
+        //   handleInitialPoseMessage(last_received_gps_msg);
+        //   degraded_amcl_localisation_counter = 0;
+        // }
 
         // bool reset_pose = false;
         // if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std && pose_discrepancy > 0.2 + 4*gps_mask_std)

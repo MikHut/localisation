@@ -589,7 +589,7 @@ AmclNode::AmclNode() :
   dsrv_->setCallback(cb);
 
   // 15s timer to warn on lack of receipt of laser scans, #5209
-  laser_check_interval_ = ros::Duration(5.0);
+  laser_check_interval_ = ros::Duration(1.9);
   check_laser_timer_ = nh_.createTimer(laser_check_interval_, 
                                        boost::bind(&AmclNode::checkLaserReceived, this, _1));
 

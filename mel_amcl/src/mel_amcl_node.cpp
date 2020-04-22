@@ -371,7 +371,7 @@ void sigintHandler(int sig)
 int
 main(int argc, char** argv)
 {
-  ros::init(argc, argv, "amcl");
+  ros::init(argc, argv, "mel_amcl");
   ros::NodeHandle nh;
 
   // Override default sigint handler
@@ -565,12 +565,12 @@ AmclNode::AmclNode() :
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
 
-  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 100);
+  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 5);
   laser_scan_filter_ = 
           new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
                                                              *tf_,
                                                              odom_frame_id_,
-                                                             100,
+                                                             5,
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
@@ -589,7 +589,7 @@ AmclNode::AmclNode() :
   dsrv_->setCallback(cb);
 
   // 15s timer to warn on lack of receipt of laser scans, #5209
-  laser_check_interval_ = ros::Duration(15.0);
+  laser_check_interval_ = ros::Duration(5.0);
   check_laser_timer_ = nh_.createTimer(laser_check_interval_, 
                                        boost::bind(&AmclNode::checkLaserReceived, this, _1));
 

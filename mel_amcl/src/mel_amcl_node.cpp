@@ -1034,7 +1034,7 @@ AmclNode::checkLaserReceived(const ros::TimerEvent& event)
   ros::Duration d = ros::Time::now() - last_laser_received_ts_;
   if(d > laser_check_interval_)
   {
-    ROS_WARN("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
+    ROS_ERROR("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
              d.toSec(),
              ros::names::resolve(scan_topic_).c_str());
 
@@ -1270,7 +1270,7 @@ AmclNode::getOdomPose(geometry_msgs::PoseStamped& odom_pose,
   }
   catch(tf2::TransformException e)
   {
-    ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
+    ROS_ERROR("Failed to compute odom pose, skipping scan (%s)", e.what());
     return false;
   }
   x = odom_pose.pose.position.x;

@@ -565,12 +565,12 @@ AmclNode::AmclNode() :
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
 
-  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 5);
+  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 20);
   laser_scan_filter_ = 
           new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
                                                              *tf_,
                                                              odom_frame_id_,
-                                                             5,
+                                                             20,
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
@@ -1750,9 +1750,9 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           mel_status = 6;
         else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 5;
-        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[1] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
             mel_status = 4;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[0])
+        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[1])
             mel_status = 3;
         else if (pose_discrepancy < pose_discrepancy_thresholds[2] + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 2;

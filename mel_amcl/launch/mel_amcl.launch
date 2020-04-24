@@ -44,7 +44,7 @@
     <param name="publish_mel_health_" value="true"/>
     <param name="pose_discrepancy_thresholds" value="[0.2, 1.0, 5.0]"/>
     <param name="gps_error_thresholds" value="[0.1, 0.25, 1.5]"/>
-    <param name="scan_match_thresholds" value="[15.0, 5.0, 2.0]"/>
+    <param name="scan_match_thresholds" value="[15.0, 10.0, 2.0]"/>
 
   	<!--robot initial pose-->
   	<param name="initial_pose_x" value="$(arg initial_pose_x)"/>
@@ -56,8 +56,8 @@
 
 
 	  <!--overall filter -->
-    <param name="min_particles" value="50"/>
-    <param name="max_particles" value="1000"/>
+    <param name="min_particles" value="100"/>
+    <param name="max_particles" value="4000"/>
     <param name="kld_err" value="0.01"/>
     <param name="kld_z" value="0.99"/>
     <!-- <param name="update_min_d" value="0.05"/> -->

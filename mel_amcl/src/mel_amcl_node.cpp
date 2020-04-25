@@ -255,7 +255,8 @@ private:
   int sx, sy;
   double resolution;
 
-  message_filters::Subscriber<sensor_msgs::LaserScan> *laser_scan_sub_;
+  ros::Subscriber laser_scan_sub_;
+  // message_filters::Subscriber<sensor_msgs::LaserScan> *laser_scan_sub_;
   tf2_ros::MessageFilter<sensor_msgs::LaserScan> *laser_scan_filter_;
   ros::Subscriber initial_pose_sub_;
   ros::Subscriber gps_pose_sub_;
@@ -565,15 +566,16 @@ AmclNode::AmclNode() :
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
 
-  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 20);
-  laser_scan_filter_ = 
-          new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
-                                                             *tf_,
-                                                             odom_frame_id_,
-                                                             20,
-                                                             nh_);
-  laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
-                                                   this, _1));
+  laser_scan_sub_ = nh_.subscribe(scan_topic_, 1, &AmclNode::laserReceived, this);
+  // laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 20);
+  // laser_scan_filter_ = 
+  //         new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
+  //                                                            *tf_,
+  //                                                            odom_frame_id_,
+  //                                                            20,
+  //                                                            nh_);
+  // laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
+  //                                                  this, _1));
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 
   if(use_map_topic_) {
@@ -855,15 +857,17 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   base_frame_id_ = stripSlash(config.base_frame_id);
   global_frame_id_ = stripSlash(config.global_frame_id);
 
-  delete laser_scan_filter_;
-  laser_scan_filter_ = 
-          new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
-                                                             *tf_,
-                                                             odom_frame_id_,
-                                                             100,
-                                                             nh_);
-  laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
-                                                   this, _1));
+  // delete laser_scan_filter_;
+  laser_scan_sub_ = nh_.subscribe(scan_topic_, 2, &AmclNode::laserReceived, this);
+
+  // laser_scan_filter_ = 
+  //         new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
+  //                                                            *tf_,
+  //                                                            odom_frame_id_,
+  //                                                            100,
+  //                                                            nh_);
+  // laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
+  //                                                  this, _1));
 
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 }
@@ -1262,7 +1266,7 @@ AmclNode::getOdomPose(geometry_msgs::PoseStamped& odom_pose,
   // Get the robot's pose
   geometry_msgs::PoseStamped ident;
   ident.header.frame_id = stripSlash(f);
-  ident.header.stamp = t;
+  ident.header.stamp = ros::Time(0);
   tf2::toMsg(tf2::Transform::getIdentity(), ident.pose);
   try
   {

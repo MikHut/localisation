@@ -552,7 +552,7 @@ AmclNode::AmclNode() :
 
   cloud_pub_interval.fromSec(1.0);
   tfb_.reset(new tf2_ros::TransformBroadcaster());
-  tf_.reset(new tf2_ros::Buffer());
+  tf_.reset(new tf2_ros::Buffer(ros::Duration(0.2)));
   tfl_.reset(new tf2_ros::TransformListener(*tf_));
 
   pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", 2, true);

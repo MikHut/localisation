@@ -85,6 +85,11 @@
 
 using namespace mel_amcl;
 
+namespace tf2_ros
+{
+class TransformListener;
+}
+
 // Pose hypothesis
 typedef struct
 {
@@ -182,6 +187,8 @@ private:
                       nav_msgs::SetMap::Response &res);
 
   void laserReceived(const sensor_msgs::LaserScanConstPtr &laser_scan);
+  // template<class M>
+  void failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_ros::filter_failure_reasons::FilterFailureReason reason);
   void initialPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void handleInitialPoseMessage(const geometry_msgs::PoseWithCovarianceStamped &msg);
   void mapReceived(const nav_msgs::OccupancyGridConstPtr &msg);
@@ -344,6 +351,9 @@ private:
   laser_model_t laser_model_type_;
   bool tf_broadcast_;
   bool selective_resampling_;
+  int callback_consecutive_failures_{0};
+  ros::Time callback_failure_start_time_;
+
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -574,6 +584,10 @@ AmclNode::AmclNode() :
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
+  // template<class M>
+  // laser_scan_filter_->registerFailureCallback(&AmclNode::failureCallback);
+  laser_scan_filter_->registerFailureCallback(boost::bind(&AmclNode::failureCallback, this, _1, _2));
+
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 
   if(use_map_topic_) {
@@ -1355,9 +1369,33 @@ AmclNode::setMapCallback(nav_msgs::SetMap::Request& req,
   return true;
 }
 
+// template<class M>
+void 
+AmclNode::failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_ros::filter_failure_reasons::FilterFailureReason reason)
+{
+
+  if (callback_consecutive_failures_ == 0)
+  {
+    callback_failure_start_time_ = ros::Time::now();
+  }
+
+  ++callback_consecutive_failures_;
+
+  if (callback_consecutive_failures_ > 1)
+  {
+    ros::Duration d = ros::Time::now() - callback_failure_start_time_;
+    ROS_ERROR("Message filter failed for %f seconds! There were %d consecutive "
+              "failures.", d.toSec(), callback_consecutive_failures_);
+    std::cout << "\033[1;34m Reason for callback failure: " << reason << "\033[34m \n";
+  }
+}
+
+
+
 void
 AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 {
+  callback_consecutive_failures_=0;
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
   AMCLPoseData pdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);

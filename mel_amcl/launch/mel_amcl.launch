@@ -84,6 +84,9 @@
     <param name="laser_model_type" value="likelihood_field_prob"/>
 
     <param name="do_beamskip" value="true"/>
+    
+    
+    <param name="callback_failures_warn_threshold" value="10"/> 
 
 	<!-- odometry model -->
     <param name="odom_model_type" value="omni-corrected" if="$(arg use_omni)"/>

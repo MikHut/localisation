@@ -351,9 +351,9 @@ private:
   laser_model_t laser_model_type_;
   bool tf_broadcast_;
   bool selective_resampling_;
-  int callback_consecutive_failures_{0};
+  int callback_consecutive_failures_;
   ros::Time callback_failure_start_time_;
-
+  int callback_failures_warn_threshold_;
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -517,6 +517,7 @@ AmclNode::AmclNode() :
   private_nh_.param("recovery_alpha_fast", alpha_fast_, 0.1);
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
   private_nh_.param("filter_scan_by_range", filter_scan_by_range, true);
+  private_nh_.param("callback_failures_warn_threshold", callback_failures_warn_threshold_, 10);
 
 
   // For GPS
@@ -791,6 +792,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
     config.max_particles = config.min_particles;
   }
 
+  callback_failures_warn_threshold_ = config.callback_failures_warn_threshold;
   min_particles_ = config.min_particles;
   max_particles_ = config.max_particles;
   alpha_slow_ = config.recovery_alpha_slow;
@@ -874,10 +876,11 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
           new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
                                                              *tf_,
                                                              odom_frame_id_,
-                                                             100,
+                                                             1,
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
+  laser_scan_filter_->registerFailureCallback(boost::bind(&AmclNode::failureCallback, this, _1, _2));
 
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 }
@@ -1381,12 +1384,12 @@ AmclNode::failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_
 
   ++callback_consecutive_failures_;
 
-  if (callback_consecutive_failures_ > 1)
+  if (callback_consecutive_failures_ > callback_failures_warn_threshold_)
   {
     ros::Duration d = ros::Time::now() - callback_failure_start_time_;
     ROS_ERROR("Message filter failed for %f seconds! There were %d consecutive "
               "failures.", d.toSec(), callback_consecutive_failures_);
-    std::cout << "\033[1;34m Reason for callback failure: " << reason << "\033[34m \n";
+    std::cout << "\033[1;36m Reason for callback failure: " << reason << "\033[36m \n";
   }
 }
 
@@ -1395,7 +1398,7 @@ AmclNode::failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_
 void
 AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 {
-  callback_consecutive_failures_=0;
+  callback_consecutive_failures_ = 0;
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
   AMCLPoseData pdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);

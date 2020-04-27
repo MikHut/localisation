@@ -858,7 +858,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   global_frame_id_ = stripSlash(config.global_frame_id);
 
   // delete laser_scan_filter_;
-  laser_scan_sub_ = nh_.subscribe(scan_topic_, 2, &AmclNode::laserReceived, this);
+  laser_scan_sub_ = nh_.subscribe(scan_topic_, 1, &AmclNode::laserReceived, this);
 
   // laser_scan_filter_ = 
   //         new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
@@ -1881,14 +1881,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 
         geometry_msgs::PoseStamped tmp_tf_stamped;
         tmp_tf_stamped.header.frame_id = base_frame_id_;
-        tmp_tf_stamped.header.stamp = laser_scan->header.stamp;
+        tmp_tf_stamped.header.stamp = ros::Time(0); // laser_scan->header.stamp;
         tf2::toMsg(tmp_tf.inverse(), tmp_tf_stamped.pose);
 
         this->tf_->transform(tmp_tf_stamped, odom_to_map, odom_frame_id_);
       }
       catch(tf2::TransformException)
       {
-        ROS_DEBUG("Failed to subtract base to odom transform");
+        ROS_ERROR("Failed to subtract base to odom transform");
         return;
       }
 

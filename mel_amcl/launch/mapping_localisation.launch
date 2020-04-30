@@ -28,15 +28,17 @@
 
 
   <!-- load parameters for eKF -->
-  <rosparam command="load" file="$(find mel_amcl)/config/mapping_with_rtk.yaml" />
+  <rosparam command="load" file="$(find mel_amcl)/config/mapping_localisation.yaml" />
 
 
   <!-- eKF for the odom frame using gps - we only use odom frame for mapping - but use GPS data. 
-       Gmapping makes map frame - But should equal odom!!!. -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_local" clear_params="true">
-    <remap from="odometry/filtered" to="odometry/gps"/>
+  Gmapping makes map frame - But should equal odom!!!. -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true">
+    <!-- Input remapping -->
     <remap from="odometry/gps" to="odometry/gps/mask"/>
-    <remap from="/yaw" to="/yaw/mask"/>
+    <remap from="yaw" to="yaw/mask"/>
+    <!-- Output remapping -->
+    <remap from="odometry/filtered" to="odometry/gps"/>
   </node>
 
 

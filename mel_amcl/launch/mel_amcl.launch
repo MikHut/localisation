@@ -1,14 +1,6 @@
 <?xml version="1.0"?>
 <launch>
 
-
-  <!-- <rosparam command="load" file="$(find rasberry_localisation)/config/norway_localisation.yaml" /> -->
-
-
-  <!-- <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se_odom" clear_params="true">
-    <remap from="odometry/filtered" to="rl/odom"/>
-  </node> -->
-
   <arg name="use_gps" default="true"/>
   <arg name="use_gps_odom" default="true"/>
   <arg name="gps_mask_std" default="0.14" />
@@ -21,16 +13,12 @@
   <arg name="initial_pose_x" default="0.0"/>
   <arg name="initial_pose_y" default="0.0"/>
   <arg name="initial_pose_a" default="0.0"/>
-
   <arg name="initial_cov_xx" default="0.0"/>
   <arg name="initial_cov_yy" default="0.0"/>
   <arg name="initial_cov_aa" default="0.0"/>
-  
 
 
   <node pkg="mel_amcl" type="mel_amcl" name="mel_amcl" output="screen">
-
-	  <!-- see param description on http://www.ros.org/wiki/amcl -->     
 
     <!-- GPS parameters -->
     <param name="use_gps" value="$(arg use_gps)"/>
@@ -55,14 +43,12 @@
 	  <param name="initial_cov_aa" value="$(arg initial_cov_aa)"/>
 
 
-	  <!--overall filter -->
+	  <!-- overall filter -->
     <param name="min_particles" value="100"/>
     <param name="max_particles" value="4000"/>
     <param name="kld_err" value="0.01"/>
     <param name="kld_z" value="0.99"/>
-    <!-- <param name="update_min_d" value="0.05"/> -->
     <param name="update_min_d" value="0.15"/>
-    <!-- <param name="update_min_a" value="0.52"/> -->
     <param name="update_min_a" value="0.3"/>
     <param name="resample_interval" value="2"/>
     <param name="transform_tolerance" value="0.1"/>
@@ -70,9 +56,9 @@
     <param name="recovery_alpha_fast" value="0.0"/> <!-- 0.0 -->
     <param name="gui_publish_rate" value="10.0"/>
 
-	<!-- laser model -->
+	  <!-- laser model -->
     <param name="laser_max_range" value="6.0"/> 
-    <param name="laser_min_range" value="-1.0"/>  <!-- -1.0 means get from scan topic -->
+    <param name="laser_min_range" value="-1.0"/>
     <param name="laser_max_beams" value="30"/> 
     <param name="laser_z_hit" value="0.95"/>
     <param name="laser_z_short" value="0.1"/>
@@ -82,10 +68,9 @@
     <param name="laser_lambda_short" value="0.1"/>
     <param name="laser_likelihood_max_dist" value="2.0"/>
     <param name="laser_model_type" value="likelihood_field_prob"/>
-
     <param name="do_beamskip" value="true"/>
 
-	<!-- odometry model -->
+	  <!-- odometry model -->
     <param name="odom_model_type" value="omni-corrected" if="$(arg use_omni)"/>
     <param name="odom_model_type" value="diff-corrected" unless="$(arg use_omni)"/>
     <param name="odom_alpha1" value="0.04"/> <!-- 0.014 -->
@@ -95,13 +80,11 @@
     <param name="odom_alpha5" value="0.04"/>
     <param name="odom_frame_id" value="odom"/>
     <param name="base_frame_id" value="base_link"/>
-    <param name="global_frame_id" value="map" />
-		 
+    <param name="global_frame_id" value="map" />	 
 		
-	<!-- map -->
+	  <!-- map -->
     <param name="use_map_topic" value="true"/>
 
-    <!-- publish map->odom? Turn off if fusing again with robot_localisation -->
     <param name="tf_broadcast" value="true"/>
 
   </node>

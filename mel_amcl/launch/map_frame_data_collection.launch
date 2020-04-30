@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
-
 <launch>
 
   <arg name="bag_prefix" default="data"/>

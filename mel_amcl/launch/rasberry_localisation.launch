@@ -4,7 +4,7 @@
   <arg name="site_name" default="riseholme"/>
   <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
-  <arg name="ekf_publish_tf" default="true" />
+  <arg name="ekf_publish_tf" default="false" />
   <arg name="use_gps_only" default="false" />
 
   <arg name="fuse_gps" default="true" />
@@ -21,30 +21,29 @@
 
   <!-- launch mel_amcl for GPS and Lidar sensor fusion -->
   <include file="$(find mel_amcl)/launch/mel_amcl.launch" unless="$(arg use_gps_only)">
-      <arg name="use_gps" value="$(arg fuse_gps)" />
-      <arg name="use_gps_odom" value="$(arg fuse_gps)" />
-      <arg name="gps_mask_std" value="$(arg gps_mask_std)" />
-      <arg name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)" />
-      <arg name="use_ekf_yaw" value="$(arg use_ekf_yaw)" />
-      <arg name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)" />
-      <arg name="initial_pose_x" value="$(arg initial_pose_x)"/>
-      <arg name="initial_pose_y" value="$(arg initial_pose_y)"/>
-      <arg name="initial_pose_a" value="$(arg initial_pose_a)"/>
+    <arg name="use_gps" value="$(arg fuse_gps)" />
+    <arg name="use_gps_odom" value="$(arg fuse_gps)" />
+    <arg name="gps_mask_std" value="$(arg gps_mask_std)" />
+    <arg name="gps_additional_pose_std" value="$(arg gps_additional_pose_std)" />
+    <arg name="use_ekf_yaw" value="$(arg use_ekf_yaw)" />
+    <arg name="gps_additional_yaw_std" value="$(arg gps_additional_yaw_std)" />
+    <arg name="initial_pose_x" value="$(arg initial_pose_x)"/>
+    <arg name="initial_pose_y" value="$(arg initial_pose_y)"/>
+    <arg name="initial_pose_a" value="$(arg initial_pose_a)"/>
   </include>
 
 
   <!-- Load params from datum file which contains site details -->
   <rosparam command="load" file="$(arg datum_file)" />
 
-  <!-- launch navsat transform which uses the datum to transform lat/lon coords to the map frame -->
-  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">     
-      <!-- Placeholders for input remapping. Set your topic names as the "to" values. -->
-      <remap from="imu/data" to="yaw"/> 
-      <remap from="odometry/filtered" to="odometry/gps"/>
-      <remap from="gps/fix" to="gps/fix"/>
-      <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
+    <!-- Input remapping -->
+    <remap from="imu/data" to="yaw"/> 
+    <remap from="odometry/filtered" to="odometry/gps"/>
+    <remap from="gps/fix" to="gps/fix"/>
+    <!-- Output remapping -->
+    <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
   </node>
-
 
   <!-- Use GNSS fence for safety and checking for a single utm zone-->
   <node pkg="mel_amcl" type="gnss_fence.py" name="gnss_fence" output="screen"  if="$(arg use_gnss_fence)"/>

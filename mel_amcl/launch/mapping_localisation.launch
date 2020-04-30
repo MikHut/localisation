@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
-
 <launch>
   
   <arg name="site_name" default="riseholme"/>
@@ -9,7 +8,6 @@
 
   <rosparam command="load" file="$(arg datum_file)" />
 
-
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
     <!-- Input remapping -->
     <remap from="imu/data" to="yaw"/> 
@@ -18,7 +16,6 @@
     <!-- Output remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
   </node>
-
 
   <!-- GPS mask for high error data (we tend to be better off just ignoring it) -->
   <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true">
@@ -30,7 +27,6 @@
   <!-- load parameters for eKF -->
   <rosparam command="load" file="$(find mel_amcl)/config/mapping_localisation.yaml" />
 
-
   <!-- eKF for the odom frame using gps - we only use odom frame for mapping - but use GPS data. 
   Gmapping makes map frame - But should equal odom!!!. -->
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true">
@@ -40,6 +36,5 @@
     <!-- Output remapping -->
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node>
-
 
 </launch>

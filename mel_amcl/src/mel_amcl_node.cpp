@@ -1045,14 +1045,21 @@ void
 AmclNode::checkLaserReceived(const ros::TimerEvent& event)
 {
   ros::Duration d = ros::Time::now() - last_laser_received_ts_;
-  if(d > laser_check_interval_)
+  if(d > laser_check_interval_ && last_laser_received_ts_.is_zero())
   {
-    ROS_ERROR("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
+    ROS_WARN("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
              d.toSec(),
              ros::names::resolve(scan_topic_).c_str());
 
     use_gps_without_scan = true;
   }
+  else if (d > laser_check_interval_)
+  {
+    ROS_ERROR("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
+             d.toSec(),
+             ros::names::resolve(scan_topic_).c_str());
+
+    use_gps_without_scan = true;  }
   else
   {
     use_gps_without_scan = false;

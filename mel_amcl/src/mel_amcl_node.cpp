@@ -85,10 +85,6 @@
 
 using namespace mel_amcl;
 
-namespace tf2_ros
-{
-class TransformListener;
-}
 
 // Pose hypothesis
 typedef struct

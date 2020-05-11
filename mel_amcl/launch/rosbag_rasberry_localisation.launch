@@ -4,7 +4,7 @@
 
   <param name="/use_sim_time" value="true"/>
 
-  <arg name="site_name" default="clockhouse"/>
+  <arg name="site_name" default="riseholme"/>
   <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
 
   <arg name="ekf_publish_tf" default="true" />
@@ -17,11 +17,12 @@
   <arg name="gps_additional_yaw_std" default="0.4" />
 
   <!-- Rosbag args -->
-  <arg name="path" default="/media/$(env USER)/DATA/map_frame/clockhouse/" />
-  <arg name="file_name" default="clockhouse_mid.bag" />
-  <arg name="bag_rate" default="1" />
+  <arg name="path" default="/media/$(env USER)/DATA/map_frame/" />
+  <arg name="file_name" default="tall_robot_data_2019-08-20-15-17-25.bag" />
+  <arg name="bag_rate" default="10" />
+  <arg name="bag_start" default="0" />
 
-  <arg name="map_file" default="$(find rasberry_navigation)/maps/clockhouse/clockhouse_vanity.yaml"/>
+  <arg name="map_file" default="$(find rasberry_navigation)/maps/riseholme/riseholme_rtk_fix.yaml"/>
 
 
   <!-- Load map -->
@@ -31,7 +32,7 @@
   <node pkg="rosbag" type="play" name="player1" output="screen" args="$(arg path)$(arg file_name)
         --rate=1 --duration=2 --keep-alive --topics /tf_static"/>
   <node pkg="rosbag" type="play" name="player2" output="screen" args="--clock $(arg path)$(arg file_name)
-        --rate=1 --start=1500 --duration=3600 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan /nmea/main_GGA /imu/data"/>
+        --rate=$(arg bag_rate) --start=$(arg bag_start) --duration=3600 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan /nmea/main_GGA /imu/data"/>
   
 
   <!-- Run rasberry_localisation.launch aka MEL -->

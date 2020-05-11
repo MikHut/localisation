@@ -334,6 +334,7 @@ private:
   ros::Timer check_gps_timer_;
 
   int max_beams_, min_particles_, max_particles_;
+  double min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_;
   double alpha1_, alpha2_, alpha3_, alpha4_, alpha5_;
   double alpha_slow_, alpha_fast_;
   double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;
@@ -350,6 +351,10 @@ private:
   int callback_consecutive_failures_;
   ros::Time callback_failure_start_time_;
   int callback_failures_warn_threshold_;
+
+  bool timed_no_motion_updates_;
+  ros::Time last_filter_update_ts_;
+  ros::Duration laser_update_interval_;
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -443,11 +448,20 @@ AmclNode::AmclNode() :
   private_nh_.param("max_particles", max_particles_, 5000);
   private_nh_.param("kld_err", pf_err_, 0.01);
   private_nh_.param("kld_z", pf_z_, 0.99);
+  private_nh_.param("min_odom_trans_stddev", min_odom_trans_stddev_, 0.0);
+  private_nh_.param("min_odom_strafe_stddev", min_odom_strafe_stddev_, 0.0);
+  private_nh_.param("min_odom_rot_stddev", min_odom_rot_stddev_, 0.0);
+
   private_nh_.param("odom_alpha1", alpha1_, 0.2);
   private_nh_.param("odom_alpha2", alpha2_, 0.2);
   private_nh_.param("odom_alpha3", alpha3_, 0.2);
   private_nh_.param("odom_alpha4", alpha4_, 0.2);
   private_nh_.param("odom_alpha5", alpha5_, 0.2);
+  private_nh_.param("laser_update_interval", tmp, 2.0);
+  laser_update_interval_ = ros::Duration(tmp);
+  private_nh_.param("timed_no_motion_updates", timed_no_motion_updates_, true);
+
+  
   
   private_nh_.param("do_beamskip", do_beamskip_, false);
   private_nh_.param("beam_skip_distance", beam_skip_distance_, 0.5);
@@ -752,6 +766,9 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
 
   max_beams_ = config.laser_max_beams;
   filter_scan_by_range = config.filter_scan_by_range;
+  min_odom_trans_stddev_ = config.min_odom_trans_stddev;
+  min_odom_strafe_stddev_ = config.min_odom_strafe_stddev;
+  min_odom_rot_stddev_ = config.min_odom_rot_stddev;
   alpha1_ = config.odom_alpha1;
   alpha2_ = config.odom_alpha2;
   alpha3_ = config.odom_alpha3;
@@ -836,7 +853,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   delete odom_;
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
-  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_, min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_);
   //Pose
   delete pose_;
   pose_ = new AMCLPose();
@@ -1181,7 +1198,7 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
   delete odom_;
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
-  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_, min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_);
   //Pose
   delete pose_;
   pose_ = new AMCLPose();
@@ -1480,6 +1497,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     bool update = fabs(delta.v[0]) > d_thresh_ ||
                   fabs(delta.v[1]) > d_thresh_ ||
                   fabs(delta.v[2]) > a_thresh_;
+
+    if (timed_no_motion_updates_)
+      update = update || ((ros::Time::now() - last_filter_update_ts_) > laser_update_interval_);
+
     update = update || m_force_update;
     m_force_update=false;
 
@@ -1530,7 +1551,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   // If the robot has moved, update the filter
   if(lasers_update_[laser_index])
   {
-
+    last_filter_update_ts_ = ros::Time::now();
     if ((use_gps || use_gps_odom) && gps_received)
     {
       

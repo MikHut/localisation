@@ -63,20 +63,29 @@ class AMCLOdom : public AMCLSensor
   public: void SetModelDiff(double alpha1, 
                             double alpha2, 
                             double alpha3, 
-                            double alpha4);
+                            double alpha4,
+                            double min_odom_trans_stddev,
+                            double min_odom_strafe_stddev,
+                            double min_odom_rot_stddev);
 
   public: void SetModelOmni(double alpha1, 
                             double alpha2, 
                             double alpha3, 
                             double alpha4,
-                            double alpha5);
+                            double alpha5,
+                            double min_odom_trans_stddev,
+                            double min_odom_strafe_stddev,
+                            double min_odom_rot_stddev);
 
   public: void SetModel( odom_model_t type,
                          double alpha1,
                          double alpha2,
                          double alpha3,
                          double alpha4,
-                         double alpha5 = 0 );
+                         double alpha5,
+                         double min_odom_trans_stddev,
+                         double min_odom_strafe_stddev,
+                         double min_odom_rot_stddev);
 
   // Update the filter based on the action model.  Returns true if the filter
   // has been updated.
@@ -90,6 +99,8 @@ class AMCLOdom : public AMCLSensor
 
   // Drift parameters
   private: double alpha1, alpha2, alpha3, alpha4, alpha5;
+  private: double min_odom_trans_stddev, min_odom_strafe_stddev, min_odom_rot_stddev;
+
 };
 
 

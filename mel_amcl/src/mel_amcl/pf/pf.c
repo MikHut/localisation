@@ -142,7 +142,7 @@ void pf_init(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
 
   set->sample_count = pf->max_samples;
 
-  pdf = pf_pdf_gaussian_alloc(mean, cov);
+  pdf = pf_pdf_gaussian_alloc(&mean, &cov);
     
   // Compute the new sample poses
   for (i = 0; i < set->sample_count; i++)
@@ -508,7 +508,7 @@ void pf_update_resample(pf_t *pf)
 
 
 // Resample the distribution
-void pf_update_resample_jump(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
+void pf_update_resample_jump(pf_t *pf, pf_vector_t *mean, pf_matrix_t *cov, double jump_weight)
 {
   int i;
   double total;
@@ -520,6 +520,7 @@ void pf_update_resample_jump(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
   //double count_inv;
   double* c;
 
+  double jump_prob;
   double w_diff;
 
   set_a = pf->sets + pf->current_set;
@@ -557,6 +558,16 @@ void pf_update_resample_jump(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
   // Prepare Gaussian PDF to generate particles at GPS
   pdf = pf_pdf_gaussian_alloc(mean, cov);
 
+  if (jump_weight > 1.0)
+    jump_weight = 1.0;
+
+  jump_prob = 0.1 * jump_weight;
+
+  if(jump_prob < 0.0)
+    jump_prob = 0.0;
+
+  // printf("jump prob %f\n", jump_prob);
+
   w_diff = 1.0 - pf->w_fast / pf->w_slow;
   if(w_diff < 0.0)
     w_diff = 0.0;
@@ -565,7 +576,7 @@ void pf_update_resample_jump(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
   {
     sample_b = set_b->samples + set_b->sample_count++;
 
-    if(drand48() < 0.05) // w_diff
+    if(drand48() < jump_prob) // w_diff
       
       sample_b->pose = pf_pdf_gaussian_sample(pdf);
     else

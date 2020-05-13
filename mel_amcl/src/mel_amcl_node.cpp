@@ -242,9 +242,11 @@ private:
   double additional_yaw_std_;
   double pose_error_factor;
   bool filter_scan_by_range;
+  // Percentage difference in scan likelihood of gps vs amcl
+  double gps_amcl_weight_comparison_{0};
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 3;
-  int degraded_amcl_localisation_counter = 0;
+  // int degraded_amcl_localisation_counter = 0;
   // mel health parameters
   bool publish_mel_health_;
   const int health_size = 3;
@@ -1551,6 +1553,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   // If the robot has moved, update the filter
   if(lasers_update_[laser_index])
   {
+    ++resample_count_;
     last_filter_update_ts_ = ros::Time::now();
     if ((use_gps || use_gps_odom) && gps_received)
     {
@@ -1567,14 +1570,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
              d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);
 
       // Resample the particles
-      if(!(++resample_count_ % resample_interval_) && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
+      if(!(resample_count_ % resample_interval_) && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
       {
-        ROS_WARN("JUMP UPDATE");
+        ROS_WARN("JUMP UPDATE, weight comparison: %f", gps_amcl_weight_comparison_);
         pf_matrix_t cov = pf_matrix_zero();
         cov.m[0][0] = pow(pdata.pose_std.v[0],2);
         cov.m[1][1] = pow(pdata.pose_std.v[1],2);
         cov.m[2][2] = pow(pdata.pose_std.v[2],2);
-        pf_update_resample_jump(pf_, pdata.pose, cov);
+        pf_update_resample_jump(pf_, &pdata.pose, &cov, gps_amcl_weight_comparison_);
         resampled = true;
       }
 
@@ -1793,7 +1796,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       if ((use_gps || use_gps_odom) && gps_received)
       {
         double weight_gps_from_scan;
-
         if (laser_model_type_ == LASER_MODEL_BEAM)
         {
           weight_gps_from_scan = AMCLLaser::BeamModelFromPose((AMCLLaserData *)&ldata, last_received_gps_pose.v[0], last_received_gps_pose.v[1], last_received_gps_pose.v[2]);
@@ -1843,43 +1845,11 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);
 
-        if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
-          degraded_amcl_localisation_counter++;
-        else
-          degraded_amcl_localisation_counter = 0;
-
-        
-        // if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-        // {
-        //   ROS_WARN("Resetting AMCL pose due to pose discepancy");
-        //   handleInitialPoseMessage(last_received_gps_msg);
-        //   degraded_amcl_localisation_counter = 0;
-        // }
-
-        // bool reset_pose = false;
-        // if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std && pose_discrepancy > 0.2 + 4*gps_mask_std)
-        // {
+        gps_amcl_weight_comparison_ = (weight_gps_from_scan - weight_amcl_from_scan) / weight_amcl_from_scan;
+        // if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
         //   degraded_amcl_localisation_counter++;
-
-        //   if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
-        //       reset_pose = true;
-
-        //   if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-        //     reset_pose = true;
-
-        //   if (reset_pose)
-        //   {
-        //     ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
-        //     // reinitialise particle filter with the gps data
-        //     handleInitialPoseMessage(last_received_gps_msg);
-        //     degraded_amcl_localisation_counter = 0;
-        //   }
-
-        // }
         // else
-        // {
         //   degraded_amcl_localisation_counter = 0;
-        // }
 
       }
     }

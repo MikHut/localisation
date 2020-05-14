@@ -1846,11 +1846,17 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_pub.publish(mel_status_msg);
 
         gps_amcl_weight_comparison_ = (weight_gps_from_scan - weight_amcl_from_scan) / weight_amcl_from_scan;
-        // if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
-        //   degraded_amcl_localisation_counter++;
-        // else
-        //   degraded_amcl_localisation_counter = 0;
+        if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
+          degraded_amcl_localisation_counter++;
+        else
+          degraded_amcl_localisation_counter = 0;
 
+        if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
+        {
+          ROS_WARN("Resetting AMCL pose due to pose discepancy");
+          handleInitialPoseMessage(last_received_gps_msg);
+          degraded_amcl_localisation_counter = 0;
+        }
       }
     }
 

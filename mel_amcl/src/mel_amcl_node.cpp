@@ -246,7 +246,7 @@ private:
   double gps_amcl_weight_comparison_{0};
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 3;
-  // int degraded_amcl_localisation_counter = 0;
+  int degraded_amcl_localisation_counter = 0;
   // mel health parameters
   bool publish_mel_health_;
   const int health_size = 3;

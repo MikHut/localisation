@@ -350,13 +350,18 @@ private:
   laser_model_t laser_model_type_;
   bool tf_broadcast_;
   bool selective_resampling_;
+
+  bool use_pf_jump_;
+  double max_pf_jump_prob_;
+
   int callback_consecutive_failures_;
   ros::Time callback_failure_start_time_;
   int callback_failures_warn_threshold_;
 
-  bool timed_no_motion_updates_;
+  bool use_timed_no_motion_updates_;
   ros::Time last_filter_update_ts_;
   ros::Duration laser_update_interval_;
+
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -459,11 +464,11 @@ AmclNode::AmclNode() :
   private_nh_.param("odom_alpha3", alpha3_, 0.2);
   private_nh_.param("odom_alpha4", alpha4_, 0.2);
   private_nh_.param("odom_alpha5", alpha5_, 0.2);
-  private_nh_.param("laser_update_interval", tmp, 2.0);
-  laser_update_interval_ = ros::Duration(tmp);
-  private_nh_.param("timed_no_motion_updates", timed_no_motion_updates_, true);
 
-  
+  private_nh_.param("use_timed_no_motion_updates", use_timed_no_motion_updates_, true);
+  private_nh_.param("min_laser_update_rate", tmp, 2.0);
+  laser_update_interval_ = ros::Duration(1.0/tmp);
+
   
   private_nh_.param("do_beamskip", do_beamskip_, false);
   private_nh_.param("beam_skip_distance", beam_skip_distance_, 0.5);
@@ -530,6 +535,9 @@ AmclNode::AmclNode() :
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
   private_nh_.param("filter_scan_by_range", filter_scan_by_range, true);
   private_nh_.param("callback_failures_warn_threshold", callback_failures_warn_threshold_, 10);
+
+  private_nh_.param("use_pf_jump", use_pf_jump_, true);
+  private_nh_.param("max_pf_jump_prob", max_pf_jump_prob_, 0.1);
 
 
   // For GPS
@@ -752,6 +760,12 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   additional_pose_std_ = config.gps_additional_pose_std;
   additional_yaw_std_ = config.gps_additional_yaw_std;
   pose_error_factor = config.pose_error_factor;
+
+  use_timed_no_motion_updates_ = config.use_timed_no_motion_updates;
+  laser_update_interval_ = ros::Duration(1.0/config.min_laser_update_rate);
+
+  use_pf_jump_ = config.use_pf_jump;
+  max_pf_jump_prob_ = config.max_pf_jump_prob;
 
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;
@@ -1500,7 +1514,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
                   fabs(delta.v[1]) > d_thresh_ ||
                   fabs(delta.v[2]) > a_thresh_;
 
-    if (timed_no_motion_updates_)
+    if (use_timed_no_motion_updates_)
       update = update || ((ros::Time::now() - last_filter_update_ts_) > laser_update_interval_);
 
     update = update || m_force_update;
@@ -1570,14 +1584,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
              d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);
 
       // Resample the particles
-      if(!(resample_count_ % resample_interval_) && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
+      if(!(resample_count_ % resample_interval_) && use_pf_jump_ && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
       {
         ROS_WARN("JUMP UPDATE, weight comparison: %f", gps_amcl_weight_comparison_);
         pf_matrix_t cov = pf_matrix_zero();
         cov.m[0][0] = pow(pdata.pose_std.v[0],2);
         cov.m[1][1] = pow(pdata.pose_std.v[1],2);
         cov.m[2][2] = pow(pdata.pose_std.v[2],2);
-        pf_update_resample_jump(pf_, &pdata.pose, &cov, gps_amcl_weight_comparison_);
+        pf_update_resample_jump(pf_, &pdata.pose, &cov, gps_amcl_weight_comparison_, max_pf_jump_prob_);
         resampled = true;
       }
 

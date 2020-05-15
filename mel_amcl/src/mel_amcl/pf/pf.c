@@ -508,7 +508,7 @@ void pf_update_resample(pf_t *pf)
 
 
 // Resample the distribution
-void pf_update_resample_jump(pf_t *pf, pf_vector_t *mean, pf_matrix_t *cov, double jump_weight)
+void pf_update_resample_jump(pf_t *pf, pf_vector_t *mean, pf_matrix_t *cov, double jump_weight, double max_jump_prob)
 {
   int i;
   double total;
@@ -561,7 +561,7 @@ void pf_update_resample_jump(pf_t *pf, pf_vector_t *mean, pf_matrix_t *cov, doub
   if (jump_weight > 1.0)
     jump_weight = 1.0;
 
-  jump_prob = 0.1 * jump_weight;
+  jump_prob = max_jump_prob * jump_weight;
 
   if(jump_prob < 0.0)
     jump_prob = 0.0;

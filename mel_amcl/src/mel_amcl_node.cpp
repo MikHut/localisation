@@ -1405,10 +1405,12 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
   AMCLPoseData pdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);
-  last_laser_received_ts_ = ros::Time::now();
   if( map_ == NULL ) {
     return;
   }
+  
+  last_laser_received_ts_ = ros::Time::now();
+
   boost::recursive_mutex::scoped_lock lr(configuration_mutex_);
   int laser_index = -1;
 

@@ -68,13 +68,19 @@ void
 AMCLOdom::SetModelDiff(double alpha1, 
                        double alpha2, 
                        double alpha3, 
-                       double alpha4)
+                       double alpha4,
+                       double min_odom_trans_stddev,
+                       double min_odom_strafe_stddev,
+                       double min_odom_rot_stddev)
 {
   this->model_type = ODOM_MODEL_DIFF;
   this->alpha1 = alpha1;
   this->alpha2 = alpha2;
   this->alpha3 = alpha3;
   this->alpha4 = alpha4;
+  this->min_odom_trans_stddev = min_odom_trans_stddev;
+  this->min_odom_strafe_stddev = min_odom_strafe_stddev;
+  this->min_odom_rot_stddev = min_odom_rot_stddev;
 }
 
 void
@@ -82,7 +88,10 @@ AMCLOdom::SetModelOmni(double alpha1,
                        double alpha2, 
                        double alpha3, 
                        double alpha4,
-                       double alpha5)
+                       double alpha5,
+                       double min_odom_trans_stddev,
+                       double min_odom_strafe_stddev,
+                       double min_odom_rot_stddev)
 {
   this->model_type = ODOM_MODEL_OMNI;
   this->alpha1 = alpha1;
@@ -90,6 +99,9 @@ AMCLOdom::SetModelOmni(double alpha1,
   this->alpha3 = alpha3;
   this->alpha4 = alpha4;
   this->alpha5 = alpha5;
+  this->min_odom_trans_stddev = min_odom_trans_stddev;
+  this->min_odom_strafe_stddev = min_odom_strafe_stddev;
+  this->min_odom_rot_stddev = min_odom_rot_stddev;
 }
 
 void
@@ -98,7 +110,10 @@ AMCLOdom::SetModel( odom_model_t type,
                     double alpha2,
                     double alpha3,
                     double alpha4,
-                    double alpha5 )
+                    double alpha5,
+                    double min_odom_trans_stddev,
+                    double min_odom_strafe_stddev,
+                    double min_odom_rot_stddev)
 {
   this->model_type = type;
   this->alpha1 = alpha1;
@@ -106,6 +121,9 @@ AMCLOdom::SetModel( odom_model_t type,
   this->alpha3 = alpha3;
   this->alpha4 = alpha4;
   this->alpha5 = alpha5;
+  this->min_odom_trans_stddev = min_odom_trans_stddev;
+  this->min_odom_strafe_stddev = min_odom_strafe_stddev;
+  this->min_odom_rot_stddev = min_odom_rot_stddev;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -224,11 +242,11 @@ bool AMCLOdom::UpdateAction(pf_t *pf, AMCLSensorData *data)
     delta_rot = ndata->delta.v[2];
 
     // Precompute a couple of things
-    double trans_hat_stddev = sqrt( alpha3 * (delta_trans*delta_trans) +
+    double trans_hat_stddev = min_odom_trans_stddev + sqrt( alpha3 * (delta_trans*delta_trans) +
                                     alpha4 * (delta_rot*delta_rot) );
-    double rot_hat_stddev = sqrt( alpha1 * (delta_rot*delta_rot) +
+    double rot_hat_stddev = min_odom_rot_stddev + sqrt( alpha1 * (delta_rot*delta_rot) +
                                   alpha2 * (delta_trans*delta_trans) );
-    double strafe_hat_stddev = sqrt( alpha4 * (delta_rot*delta_rot) +
+    double strafe_hat_stddev = min_odom_strafe_stddev + sqrt( alpha4 * (delta_rot*delta_rot) +
                                      alpha5 * (delta_trans*delta_trans) );
 
     for (int i = 0; i < set->sample_count; i++)

@@ -1,4 +1,4 @@
- 
+<?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
 
   <arg name="map1" default="/home/michael/thorvald_ws/src/RASberry/rasberry_navigation/maps/riseholme/riseholme_rtk_fix.yaml"/>

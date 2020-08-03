@@ -85,6 +85,7 @@
 
 using namespace mel_amcl;
 
+
 // Pose hypothesis
 typedef struct
 {
@@ -182,6 +183,8 @@ private:
                       nav_msgs::SetMap::Response &res);
 
   void laserReceived(const sensor_msgs::LaserScanConstPtr &laser_scan);
+  // template<class M>
+  void failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_ros::filter_failure_reasons::FilterFailureReason reason);
   void initialPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void handleInitialPoseMessage(const geometry_msgs::PoseWithCovarianceStamped &msg);
   void mapReceived(const nav_msgs::OccupancyGridConstPtr &msg);
@@ -239,6 +242,8 @@ private:
   double additional_yaw_std_;
   double pose_error_factor;
   bool filter_scan_by_range;
+  // Percentage difference in scan likelihood of gps vs amcl
+  double gps_amcl_weight_comparison_{0};
   // how many times should gps pose match the map better than AMCL before re initialising AMCL pose
   int degraded_amcl_localisation_count_max = 3;
   int degraded_amcl_localisation_counter = 0;
@@ -331,6 +336,7 @@ private:
   ros::Timer check_gps_timer_;
 
   int max_beams_, min_particles_, max_particles_;
+  double min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_;
   double alpha1_, alpha2_, alpha3_, alpha4_, alpha5_;
   double alpha_slow_, alpha_fast_;
   double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;
@@ -344,6 +350,18 @@ private:
   laser_model_t laser_model_type_;
   bool tf_broadcast_;
   bool selective_resampling_;
+
+  bool use_pf_jump_;
+  double max_pf_jump_prob_;
+
+  int callback_consecutive_failures_;
+  ros::Time callback_failure_start_time_;
+  int callback_failures_warn_threshold_;
+
+  bool use_timed_no_motion_updates_;
+  ros::Time last_filter_update_ts_;
+  ros::Duration laser_update_interval_;
+
 
   void reconfigureCB(mel_amcl::MEL_AMCLConfig &config, uint32_t level);
 
@@ -371,7 +389,7 @@ void sigintHandler(int sig)
 int
 main(int argc, char** argv)
 {
-  ros::init(argc, argv, "amcl");
+  ros::init(argc, argv, "mel_amcl");
   ros::NodeHandle nh;
 
   // Override default sigint handler
@@ -437,11 +455,20 @@ AmclNode::AmclNode() :
   private_nh_.param("max_particles", max_particles_, 5000);
   private_nh_.param("kld_err", pf_err_, 0.01);
   private_nh_.param("kld_z", pf_z_, 0.99);
+  private_nh_.param("min_odom_trans_stddev", min_odom_trans_stddev_, 0.0);
+  private_nh_.param("min_odom_strafe_stddev", min_odom_strafe_stddev_, 0.0);
+  private_nh_.param("min_odom_rot_stddev", min_odom_rot_stddev_, 0.0);
+
   private_nh_.param("odom_alpha1", alpha1_, 0.2);
   private_nh_.param("odom_alpha2", alpha2_, 0.2);
   private_nh_.param("odom_alpha3", alpha3_, 0.2);
   private_nh_.param("odom_alpha4", alpha4_, 0.2);
   private_nh_.param("odom_alpha5", alpha5_, 0.2);
+
+  private_nh_.param("use_timed_no_motion_updates", use_timed_no_motion_updates_, true);
+  private_nh_.param("min_laser_update_rate", tmp, 2.0);
+  laser_update_interval_ = ros::Duration(1.0/tmp);
+
   
   private_nh_.param("do_beamskip", do_beamskip_, false);
   private_nh_.param("beam_skip_distance", beam_skip_distance_, 0.5);
@@ -507,6 +534,10 @@ AmclNode::AmclNode() :
   private_nh_.param("recovery_alpha_fast", alpha_fast_, 0.1);
   private_nh_.param("tf_broadcast", tf_broadcast_, true);
   private_nh_.param("filter_scan_by_range", filter_scan_by_range, true);
+  private_nh_.param("callback_failures_warn_threshold", callback_failures_warn_threshold_, 10);
+
+  private_nh_.param("use_pf_jump", use_pf_jump_, true);
+  private_nh_.param("max_pf_jump_prob", max_pf_jump_prob_, 0.1);
 
 
   // For GPS
@@ -565,15 +596,19 @@ AmclNode::AmclNode() :
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
 
-  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 100);
+  laser_scan_sub_ = new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, scan_topic_, 1);
   laser_scan_filter_ = 
           new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
                                                              *tf_,
                                                              odom_frame_id_,
-                                                             100,
+                                                             1,
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
+  // template<class M>
+  // laser_scan_filter_->registerFailureCallback(&AmclNode::failureCallback);
+  laser_scan_filter_->registerFailureCallback(boost::bind(&AmclNode::failureCallback, this, _1, _2));
+
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 
   if(use_map_topic_) {
@@ -589,7 +624,7 @@ AmclNode::AmclNode() :
   dsrv_->setCallback(cb);
 
   // 15s timer to warn on lack of receipt of laser scans, #5209
-  laser_check_interval_ = ros::Duration(15.0);
+  laser_check_interval_ = ros::Duration(1.9);
   check_laser_timer_ = nh_.createTimer(laser_check_interval_, 
                                        boost::bind(&AmclNode::checkLaserReceived, this, _1));
 
@@ -726,6 +761,12 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   additional_yaw_std_ = config.gps_additional_yaw_std;
   pose_error_factor = config.pose_error_factor;
 
+  use_timed_no_motion_updates_ = config.use_timed_no_motion_updates;
+  laser_update_interval_ = ros::Duration(1.0/config.min_laser_update_rate);
+
+  use_pf_jump_ = config.use_pf_jump;
+  max_pf_jump_prob_ = config.max_pf_jump_prob;
+
   d_thresh_ = config.update_min_d;
   a_thresh_ = config.update_min_a;
 
@@ -741,6 +782,9 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
 
   max_beams_ = config.laser_max_beams;
   filter_scan_by_range = config.filter_scan_by_range;
+  min_odom_trans_stddev_ = config.min_odom_trans_stddev;
+  min_odom_strafe_stddev_ = config.min_odom_strafe_stddev;
+  min_odom_rot_stddev_ = config.min_odom_rot_stddev;
   alpha1_ = config.odom_alpha1;
   alpha2_ = config.odom_alpha2;
   alpha3_ = config.odom_alpha3;
@@ -777,6 +821,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
     config.max_particles = config.min_particles;
   }
 
+  callback_failures_warn_threshold_ = config.callback_failures_warn_threshold;
   min_particles_ = config.min_particles;
   max_particles_ = config.max_particles;
   alpha_slow_ = config.recovery_alpha_slow;
@@ -824,7 +869,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   delete odom_;
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
-  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_, min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_);
   //Pose
   delete pose_;
   pose_ = new AMCLPose();
@@ -860,10 +905,11 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
           new tf2_ros::MessageFilter<sensor_msgs::LaserScan>(*laser_scan_sub_,
                                                              *tf_,
                                                              odom_frame_id_,
-                                                             100,
+                                                             1,
                                                              nh_);
   laser_scan_filter_->registerCallback(boost::bind(&AmclNode::laserReceived,
                                                    this, _1));
+  laser_scan_filter_->registerFailureCallback(boost::bind(&AmclNode::failureCallback, this, _1, _2));
 
   initial_pose_sub_ = nh_.subscribe("initialpose", 2, &AmclNode::initialPoseReceived, this);
 }
@@ -1032,7 +1078,7 @@ void
 AmclNode::checkLaserReceived(const ros::TimerEvent& event)
 {
   ros::Duration d = ros::Time::now() - last_laser_received_ts_;
-  if(d > laser_check_interval_)
+  if(d > laser_check_interval_ && last_laser_received_ts_.is_zero())
   {
     ROS_WARN("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
              d.toSec(),
@@ -1040,6 +1086,13 @@ AmclNode::checkLaserReceived(const ros::TimerEvent& event)
 
     use_gps_without_scan = true;
   }
+  else if (d > laser_check_interval_)
+  {
+    ROS_ERROR("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
+             d.toSec(),
+             ros::names::resolve(scan_topic_).c_str());
+
+    use_gps_without_scan = true;  }
   else
   {
     use_gps_without_scan = false;
@@ -1161,7 +1214,7 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
   delete odom_;
   odom_ = new AMCLOdom();
   ROS_ASSERT(odom_);
-  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_ );
+  odom_->SetModel( odom_model_type_, alpha1_, alpha2_, alpha3_, alpha4_, alpha5_, min_odom_trans_stddev_, min_odom_strafe_stddev_, min_odom_rot_stddev_);
   //Pose
   delete pose_;
   pose_ = new AMCLPose();
@@ -1270,7 +1323,7 @@ AmclNode::getOdomPose(geometry_msgs::PoseStamped& odom_pose,
   }
   catch(tf2::TransformException e)
   {
-    ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
+    ROS_ERROR("Failed to compute odom pose, skipping scan (%s)", e.what());
     return false;
   }
   x = odom_pose.pose.position.x;
@@ -1355,16 +1408,42 @@ AmclNode::setMapCallback(nav_msgs::SetMap::Request& req,
   return true;
 }
 
+// template<class M>
+void 
+AmclNode::failureCallback(const sensor_msgs::LaserScanConstPtr &laser_scan, tf2_ros::filter_failure_reasons::FilterFailureReason reason)
+{
+
+  if (callback_consecutive_failures_ == 0)
+  {
+    callback_failure_start_time_ = ros::Time::now();
+  }
+
+  ++callback_consecutive_failures_;
+
+  if (callback_consecutive_failures_ > callback_failures_warn_threshold_)
+  {
+    ros::Duration d = ros::Time::now() - callback_failure_start_time_;
+    ROS_ERROR("Message filter failed for %f seconds! There were %d consecutive "
+              "failures.", d.toSec(), callback_consecutive_failures_);
+    std::cout << "\033[1;36m Reason for callback failure: " << reason << "\033[36m \n";
+  }
+}
+
+
+
 void
 AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
 {
+  callback_consecutive_failures_ = 0;
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
   AMCLPoseData pdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);
-  last_laser_received_ts_ = ros::Time::now();
   if( map_ == NULL ) {
     return;
   }
+  
+  last_laser_received_ts_ = ros::Time::now();
+
   boost::recursive_mutex::scoped_lock lr(configuration_mutex_);
   int laser_index = -1;
 
@@ -1436,6 +1515,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     bool update = fabs(delta.v[0]) > d_thresh_ ||
                   fabs(delta.v[1]) > d_thresh_ ||
                   fabs(delta.v[2]) > a_thresh_;
+
+    if (use_timed_no_motion_updates_)
+      update = update || ((ros::Time::now() - last_filter_update_ts_) > laser_update_interval_);
+
     update = update || m_force_update;
     m_force_update=false;
 
@@ -1486,7 +1569,8 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   // If the robot has moved, update the filter
   if(lasers_update_[laser_index])
   {
-
+    ++resample_count_;
+    last_filter_update_ts_ = ros::Time::now();
     if ((use_gps || use_gps_odom) && gps_received)
     {
       
@@ -1497,9 +1581,23 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       pdata.pose_std.v[1] = std::max(last_received_gps_raw_std.v[1], last_received_gps_std.v[1]); 
       pdata.pose_std.v[2] = std::max(last_received_gps_yaw_std, last_received_gps_std.v[2]);
       
-      ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
+      ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;
       ROS_INFO("GPS age: %f seconds. Std: x= %f, y= %f meters",
              d.toSec(), pdata.pose_std.v[0], pdata.pose_std.v[1]);
+
+      // Resample the particles
+      if(!(resample_count_ % resample_interval_) && use_pf_jump_ && d < ros::Duration(0.2) && pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std)
+      {
+        ROS_WARN("JUMP UPDATE, weight comparison: %f", gps_amcl_weight_comparison_);
+        pf_matrix_t cov = pf_matrix_zero();
+        cov.m[0][0] = pow(pdata.pose_std.v[0],2);
+        cov.m[1][1] = pow(pdata.pose_std.v[1],2);
+        cov.m[2][2] = pow(pdata.pose_std.v[2],2);
+        pf_update_resample_jump(pf_, &pdata.pose, &cov, gps_amcl_weight_comparison_, max_pf_jump_prob_);
+        resampled = true;
+      }
+
+
       if ( d < ros::Duration(0.2) )
       {
         if ( pdata.pose_std.v[0] < gps_mask_std && pdata.pose_std.v[1] < gps_mask_std )
@@ -1619,7 +1717,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     pf_odom_pose_ = pose;
 
     // Resample the particles
-    if(!(++resample_count_ % resample_interval_))
+    if(!(resample_count_ % resample_interval_) && !resampled) // ++resample_count
     {
       pf_update_resample(pf_);
       resampled = true;
@@ -1714,7 +1812,6 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       if ((use_gps || use_gps_odom) && gps_received)
       {
         double weight_gps_from_scan;
-
         if (laser_model_type_ == LASER_MODEL_BEAM)
         {
           weight_gps_from_scan = AMCLLaser::BeamModelFromPose((AMCLLaserData *)&ldata, last_received_gps_pose.v[0], last_received_gps_pose.v[1], last_received_gps_pose.v[2]);
@@ -1750,9 +1847,9 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
           mel_status = 6;
         else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0]+pdata.pose_std.v[0] && pdata.pose_std.v[0] < gps_error_thresholds[1] && weight_amcl_from_scan > scan_match_thresholds[0])
             mel_status = 5;
-        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[0] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
+        else if (d < ros::Duration(0.4) && pose_discrepancy < pose_discrepancy_thresholds[1] &&  pdata.pose_std.v[0] < gps_error_thresholds[1])
             mel_status = 4;
-        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[0])
+        else if (pose_discrepancy < pose_discrepancy_thresholds[1]+pdata.pose_std.v[0]*3 && pdata.pose_std.v[0] < gps_error_thresholds[2] && weight_amcl_from_scan > scan_match_thresholds[1])
             mel_status = 3;
         else if (pose_discrepancy < pose_discrepancy_thresholds[2] + pdata.pose_std.v[0]*3 && weight_amcl_from_scan > scan_match_thresholds[1])
           mel_status = 2;
@@ -1764,44 +1861,18 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         mel_status_msg.data = mel_status;
         mel_status_pub.publish(mel_status_msg);
 
+        gps_amcl_weight_comparison_ = (weight_gps_from_scan - weight_amcl_from_scan) / weight_amcl_from_scan;
         if (d < ros::Duration(0.4) && pose_discrepancy > 1 + 4*gps_mask_std &&  pdata.pose_std.v[0] < gps_mask_std && weight_amcl_from_scan < 4)
           degraded_amcl_localisation_counter++;
         else
           degraded_amcl_localisation_counter = 0;
 
-        
         if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
         {
           ROS_WARN("Resetting AMCL pose due to pose discepancy");
           handleInitialPoseMessage(last_received_gps_msg);
           degraded_amcl_localisation_counter = 0;
         }
-
-        // bool reset_pose = false;
-        // if (weight_gps_from_scan > weight_amcl_from_scan && pdata.pose_std.v[0] < gps_mask_std && pose_discrepancy > 0.2 + 4*gps_mask_std)
-        // {
-        //   degraded_amcl_localisation_counter++;
-
-        //   if ((weight_amcl_from_scan < 2) && (weight_gps_from_scan > 4))
-        //       reset_pose = true;
-
-        //   if (degraded_amcl_localisation_counter > degraded_amcl_localisation_count_max)
-        //     reset_pose = true;
-
-        //   if (reset_pose)
-        //   {
-        //     ROS_WARN("Resetting AMCL pose due to higer likelihood at gps.");
-        //     // reinitialise particle filter with the gps data
-        //     handleInitialPoseMessage(last_received_gps_msg);
-        //     degraded_amcl_localisation_counter = 0;
-        //   }
-
-        // }
-        // else
-        // {
-        //   degraded_amcl_localisation_counter = 0;
-        // }
-
       }
     }
 

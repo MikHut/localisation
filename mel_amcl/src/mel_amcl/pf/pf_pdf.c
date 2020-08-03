@@ -44,15 +44,15 @@ static unsigned int pf_pdf_seed;
  *************************************************************************/
 
 // Create a gaussian pdf
-pf_pdf_gaussian_t *pf_pdf_gaussian_alloc(pf_vector_t x, pf_matrix_t cx)
+pf_pdf_gaussian_t *pf_pdf_gaussian_alloc(pf_vector_t *x, pf_matrix_t *cx)
 {
   pf_matrix_t cd;
   pf_pdf_gaussian_t *pdf;
 
   pdf = calloc(1, sizeof(pf_pdf_gaussian_t));
 
-  pdf->x = x;
-  pdf->cx = cx;
+  pdf->x = *x;
+  pdf->cx = *cx;
   //pdf->cxi = pf_matrix_inverse(cx, &pdf->cxdet);
 
   // Decompose the convariance matrix into a rotation

@@ -142,7 +142,7 @@ void pf_init(pf_t *pf, pf_vector_t mean, pf_matrix_t cov)
 
   set->sample_count = pf->max_samples;
 
-  pdf = pf_pdf_gaussian_alloc(mean, cov);
+  pdf = pf_pdf_gaussian_alloc(&mean, &cov);
     
   // Compute the new sample poses
   for (i = 0; i < set->sample_count; i++)
@@ -354,6 +354,7 @@ void copy_set(pf_sample_set_t* set_a, pf_sample_set_t* set_b)
   set_b->converged = set_a->converged;
 }
 
+
 // Resample the distribution
 void pf_update_resample(pf_t *pf)
 {
@@ -450,6 +451,136 @@ void pf_update_resample(pf_t *pf)
       m++;
       */
 
+      // Naive discrete event sampler
+      double r;
+      r = drand48();
+      for(i=0;i<set_a->sample_count;i++)
+      {
+        if((c[i] <= r) && (r < c[i+1]))
+          break;
+      }
+      assert(i<set_a->sample_count);
+
+      sample_a = set_a->samples + i;
+
+      assert(sample_a->weight > 0);
+
+      // Add sample to list
+      sample_b->pose = sample_a->pose;
+    }
+
+    sample_b->weight = 1.0;
+    total += sample_b->weight;
+
+    // Add sample to histogram
+    pf_kdtree_insert(set_b->kdtree, sample_b->pose, sample_b->weight);
+
+    // See if we have enough samples yet
+    if (set_b->sample_count > pf_resample_limit(pf, set_b->kdtree->leaf_count))
+      break;
+  }
+  
+  // Reset averages, to avoid spiraling off into complete randomness.
+  if(w_diff > 0.0)
+    pf->w_slow = pf->w_fast = 0.0;
+
+  //fprintf(stderr, "\n\n");
+
+  // Normalize weights
+  for (i = 0; i < set_b->sample_count; i++)
+  {
+    sample_b = set_b->samples + i;
+    sample_b->weight /= total;
+  }
+  
+  // Re-compute cluster statistics
+  pf_cluster_stats(pf, set_b);
+
+  // Use the newly created sample set
+  pf->current_set = (pf->current_set + 1) % 2; 
+
+  pf_update_converged(pf);
+
+  free(c);
+  return;
+}
+
+
+
+// Resample the distribution
+void pf_update_resample_jump(pf_t *pf, pf_vector_t *mean, pf_matrix_t *cov, double jump_weight, double max_jump_prob)
+{
+  int i;
+  double total;
+  pf_sample_set_t *set_a, *set_b;
+  pf_sample_t *sample_a, *sample_b;
+  pf_pdf_gaussian_t *pdf;
+  //double r,c,U;
+  //int m;
+  //double count_inv;
+  double* c;
+
+  double jump_prob;
+  double w_diff;
+
+  set_a = pf->sets + pf->current_set;
+  set_b = pf->sets + (pf->current_set + 1) % 2;
+
+  if (pf->selective_resampling != 0)
+  {
+    if (set_a->n_effective > 0.5*(set_a->sample_count))
+    {
+      // copy set a to b
+      copy_set(set_a,set_b);
+
+      // Re-compute cluster statistics
+      pf_cluster_stats(pf, set_b);
+
+      // Use the newly created sample set
+      pf->current_set = (pf->current_set + 1) % 2;
+      return;
+    }
+  }
+
+
+  c = (double*)malloc(sizeof(double)*(set_a->sample_count+1));
+  c[0] = 0.0;
+  for(i=0;i<set_a->sample_count;i++)
+    c[i+1] = c[i]+set_a->samples[i].weight;
+
+  // Create the kd tree for adaptive sampling
+  pf_kdtree_clear(set_b->kdtree);
+  
+  // Draw samples from set a to create set b.
+  total = 0;
+  set_b->sample_count = 0;
+
+  // Prepare Gaussian PDF to generate particles at GPS
+  pdf = pf_pdf_gaussian_alloc(mean, cov);
+
+  if (jump_weight > 1.0)
+    jump_weight = 1.0;
+
+  jump_prob = max_jump_prob * jump_weight;
+
+  if(jump_prob < 0.0)
+    jump_prob = 0.0;
+
+  // printf("jump prob %f\n", jump_prob);
+
+  w_diff = 1.0 - pf->w_fast / pf->w_slow;
+  if(w_diff < 0.0)
+    w_diff = 0.0;
+
+  while(set_b->sample_count < pf->max_samples)
+  {
+    sample_b = set_b->samples + set_b->sample_count++;
+
+    if(drand48() < jump_prob) // w_diff
+      
+      sample_b->pose = pf_pdf_gaussian_sample(pdf);
+    else
+    {
       // Naive discrete event sampler
       double r;
       r = drand48();

@@ -36,7 +36,7 @@
   <!-- Load params from datum file which contains site details -->
   <rosparam command="load" file="$(arg datum_file)" />
 
-  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true">
+  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" respawn="true">
     <!-- Input remapping -->
     <remap from="imu/data" to="yaw"/> 
     <remap from="odometry/filtered" to="odometry/gps"/>
@@ -53,13 +53,13 @@
   <rosparam command="load" file="$(find mel_amcl)/config/rasberry_localisation.yaml" />
 
   <!-- eKF for the odom frame -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_odom_2d" clear_params="true" if="$(arg ekf_publish_tf)"/>
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_odom_2d" clear_params="true" if="$(arg ekf_publish_tf)" respawn="true"/>
 
 
-  <!-- eKF for the map frame - includes GPS data - can publish the map tf (instead of mel_amcl) if use_gps_only is true  --> 
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_2d" clear_params="true">
+  <!-- eKF for the map frame - includes GPS data - can publish the map tf (instead of mel_amcl) if use_gps_only is true  -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_2d" clear_params="true" respawn="true">
     <param name="publish_tf" value="false" unless="$(arg use_gps_only)"/>
-    <remap from="odometry/filtered" to="odometry/gps"/>  
-  </node> 
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node>
 
 </launch>

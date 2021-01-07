@@ -8,7 +8,12 @@
   <arg name="use_gps_only" default="false" />
 
   <arg name="fuse_gps" default="true" />
-  <arg name="gps_mask_std" default="0.14" />
+
+  <arg name="gnss_augmentation" default="gbas"/> <!-- gbas (rtk), sbas, or "" -->
+  <arg name="gps_mask_std" default="0.14" if="$(eval gnss_augmentation == 'gbas')" />
+  <arg name="gps_mask_std" default="0.5" if="$(eval gnss_augmentation == 'sbas')" />
+  <arg name="gps_mask_std" default="2.0" if="$(eval gnss_augmentation == '')" />
+
   <arg name="gps_additional_pose_std" default="0.1" />
   <arg name="use_ekf_yaw" default="true" />
   <arg name="gps_additional_yaw_std" default="0.1" />

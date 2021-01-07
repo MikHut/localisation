@@ -47,7 +47,7 @@
     <exec_depend>python-shapely</exec_depend>
     <!-- <exec_depend>python-utm-pip</exec_depend> -->
     <exec_depend>python-matplotlib</exec_depend>
-    <exec_depend>docker.io</exec_depend>
+    <!-- <exec_depend>docker.io</exec_depend> -->
 
 
     <test_depend>map_server</test_depend>

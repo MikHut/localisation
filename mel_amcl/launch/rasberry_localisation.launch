@@ -9,7 +9,7 @@
 
   <arg name="fuse_gps" default="true" />
 
-  <arg name="gnss_augmentation" default="gbas"/> <!-- gbas (rtk), sbas, or "" -->
+  <arg name="gnss_augmentation" default="gbas"/> <!-- gbas (rtk), sbas, or none -->
   <arg name="gps_mask_std" default="0.14" if="$(eval gnss_augmentation == 'gbas')" />
   <arg name="gps_mask_std" default="0.5" if="$(eval gnss_augmentation == 'sbas')" />
   <arg name="gps_mask_std" default="2.0" if="$(eval gnss_augmentation == 'none')" />

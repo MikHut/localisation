@@ -7,6 +7,8 @@
   <arg name="ekf_publish_tf" default="false" />
   <arg name="use_gps_only" default="false" />
 
+  <arg name="3d" default="false" />
+
   <arg name="fuse_gps" default="true" />
 
   <arg name="gnss_augmentation" default="gbas"/> <!-- gbas (rtk), sbas, or none -->
@@ -43,7 +45,7 @@
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" respawn="true">
     <!-- Input remapping -->
-    <remap from="imu/data" to="yaw"/> 
+    <remap from="imu/data" to="yaw"/>
     <remap from="odometry/filtered" to="odometry/gps"/>
     <remap from="gps/fix" to="gps/fix"/>
     <!-- Output remapping -->
@@ -62,7 +64,13 @@
 
 
   <!-- eKF for the map frame - includes GPS data - can publish the map tf (instead of mel_amcl) if use_gps_only is true  -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_2d" clear_params="true" respawn="true">
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_2d" clear_params="true" respawn="true" unless="$(arg 3d)">
+    <param name="publish_tf" value="false" unless="$(arg use_gps_only)"/>
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node>
+
+  <!-- 3D map ekf - includes GNSS data - can publish the map tf (instead of mel_amcl) if use_gps_only is true  -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map_3d" clear_params="true" respawn="true" if="$(arg 3d)">
     <param name="publish_tf" value="false" unless="$(arg use_gps_only)"/>
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node>

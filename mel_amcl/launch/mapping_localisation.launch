@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
-  
+
   <arg name="site_name" default="riseholme"/>
   <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
+
+  <arg name="3d" default="false" />
 
   <arg name="gps_error_mask_std" default="0.1" />
 
@@ -29,12 +31,22 @@
 
   <!-- eKF for the odom frame using gps - we only use odom frame for mapping - but use GPS data. 
   Gmapping makes map frame - But should equal odom!!!. -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true">
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true" unless="$(arg 3d)">
     <!-- Input remapping -->
     <remap from="odometry/gps" to="odometry/gps/mask"/>
     <remap from="yaw" to="yaw/mask"/>
     <!-- Output remapping -->
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node>
+
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true" if="$(arg 3d)">
+    <!-- Input remapping -->
+    <!-- <remap from="odometry/gps" to="odometry/gps/mask"/> -->
+    <!-- <remap from="yaw" to="yaw/mask"/> -->
+
+    <!-- Output remapping -->
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node>
+
 
 </launch>

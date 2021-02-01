@@ -12,17 +12,23 @@
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" respawn="true">
     <!-- Input remapping -->
-    <remap from="imu/data" to="yaw"/> 
+    <remap from="imu/data" to="yaw" unless="$(arg 3d)"/>
+    <remap from="imu/data" to="attitude" if="$(arg 3d)"/>
     <remap from="odometry/filtered" to="odometry/gps"/>
     <remap from="gps/fix" to="gps/fix"/>
     <!-- Output remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
   </node>
 
-  <!-- GPS mask for high error data (we tend to be better off just ignoring it) -->
-  <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true">
+  <!-- GPS mask for high error data (we tend to be better off just ignoring it)
+        so far only applies to 2d data -->
+  <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true" unless="$(arg 3d)">
+    <!-- Input remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
     <param name="gps_error_mask_std" value="$(arg gps_error_mask_std)"/>
+    <!-- Output remapping -->
+    <remap from="odometry/gps/mask" to="odometry/gps/mask"/>
+    <remap from="yaw/mask" to="yaw/mask"/>
   </node>
 
 
@@ -41,9 +47,9 @@
 
   <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true" if="$(arg 3d)">
     <!-- Input remapping -->
-    <!-- <remap from="odometry/gps" to="odometry/gps/mask"/> -->
-    <!-- <remap from="yaw" to="yaw/mask"/> -->
-
+    <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+    <remap from="yaw" to="yaw"/>
+    <remap from="attitude" to="attitude"/>
     <!-- Output remapping -->
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node>

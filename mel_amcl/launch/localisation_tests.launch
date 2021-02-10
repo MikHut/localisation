@@ -3,9 +3,7 @@
 
   <arg name="site_name" default="riseholme"/>
   <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
-  <arg name="use_sim" default="false"/>
 
-  <arg name="use_gps_only" default="false" />
 
   <arg name="three_d" default="false" />
 

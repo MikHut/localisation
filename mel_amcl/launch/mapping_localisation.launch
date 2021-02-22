@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
-  
+
   <arg name="site_name" default="riseholme"/>
   <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
+  <arg name="use_sim" default="false"/>
+
+  <arg name="three_d" default="false" />
 
   <arg name="gps_error_mask_std" default="0.1" />
 
@@ -10,17 +13,23 @@
 
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" clear_params="true" respawn="true">
     <!-- Input remapping -->
-    <remap from="imu/data" to="yaw"/> 
+    <remap from="imu/data" to="yaw" unless="$(arg three_d)"/>
+    <remap from="imu/data" to="attitude" if="$(arg three_d)"/>
     <remap from="odometry/filtered" to="odometry/gps"/>
     <remap from="gps/fix" to="gps/fix"/>
     <!-- Output remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
   </node>
 
-  <!-- GPS mask for high error data (we tend to be better off just ignoring it) -->
-  <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true">
+  <!-- GPS mask for high error data (we tend to be better off just ignoring it)
+        so far only applies to 2d data -->
+  <node pkg="mel_amcl" type="gps_odom_mask.py" name="gps_odom_mask" clear_params="true" unless="$(arg three_d)">
+    <!-- Input remapping -->
     <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
     <param name="gps_error_mask_std" value="$(arg gps_error_mask_std)"/>
+    <!-- Output remapping -->
+    <remap from="odometry/gps/mask" to="odometry/gps/mask"/>
+    <remap from="yaw/mask" to="yaw/mask"/>
   </node>
 
 
@@ -29,12 +38,22 @@
 
   <!-- eKF for the odom frame using gps - we only use odom frame for mapping - but use GPS data. 
   Gmapping makes map frame - But should equal odom!!!. -->
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true">
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true" unless="$(arg three_d)">
     <!-- Input remapping -->
     <remap from="odometry/gps" to="odometry/gps/mask"/>
     <remap from="yaw" to="yaw/mask"/>
     <!-- Output remapping -->
     <remap from="odometry/filtered" to="odometry/gps"/>
   </node>
+
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_mapping_odom_2d" clear_params="true" respawn="true" if="$(arg three_d)">
+    <!-- Input remapping -->
+    <remap from="odometry/gps" to="odometry/gps/unfiltered"/>
+    <remap from="yaw" to="yaw"/>
+    <remap from="attitude" to="imu/data" if="$(arg use_sim)"/>
+    <!-- Output remapping -->
+    <remap from="odometry/filtered" to="odometry/gps"/>
+  </node>
+
 
 </launch>

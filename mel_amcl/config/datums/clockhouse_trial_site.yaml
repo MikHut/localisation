@@ -17,7 +17,7 @@ gmapping:
 
 
 mapviz_initialize_origin:
-  local_xy_origins: 
+  local_xy_origins:
     - {
     name: dont_change_this,
     latitude: *datum_latitude,

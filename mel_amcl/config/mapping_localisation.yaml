@@ -158,6 +158,20 @@ ekf_mapping_odom_3d:
   imu1_pose_rejection_threshold: 3.0
 
 
+  ## If using UM7 or xsens instead of GNSS attitude - replace IMU1 above
+  imu2: imu/data
+  imu2_config: [false, false, false,
+                 true,  true, false,  # Don't bother fusing IMU yaw as probably wrong
+                false, false, false,
+                 false,  false,  false, # Fuse angular vel amd linear acc if calibrated only so assume not for now
+                 false,  false,  false]
+  imu2_nodelay: true
+  imu2_differential: false
+  imu2_relative: true
+  imu2_queue_size: 5
+  imu2_remove_gravitational_acceleration: true
+
+
   use_control: false
 
   # ordered as x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az

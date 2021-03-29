@@ -6,7 +6,7 @@
   <arg name="gps_mask_std" default="0.14" />
   <arg name="gps_additional_pose_std" default="0.6" />
   <arg name="use_ekf_yaw" default="true" />
-  <arg name="gps_additional_yaw_std" default="0.4" />
+  <arg name="gps_additional_yaw_std" default="0.2" />
 
   <arg name="use_omni" default="true" />
 
@@ -57,7 +57,7 @@
     <param name="gui_publish_rate" value="10.0"/>
 
 	  <!-- laser model -->
-    <param name="laser_max_range" value="6.0"/> 
+    <param name="laser_max_range" value="8.0"/> 
     <param name="laser_min_range" value="-1.0"/>
     <param name="laser_max_beams" value="30"/> 
     <param name="laser_z_hit" value="0.95"/>
@@ -76,9 +76,9 @@
 	  <!-- odometry model -->
     <param name="odom_model_type" value="omni-corrected" if="$(arg use_omni)"/>
     <param name="odom_model_type" value="diff-corrected" unless="$(arg use_omni)"/>
-    <param name="min_odom_trans_stddev" value="0.025"/> <!-- 0.014 -->
-    <param name="min_odom_strafe_stddev" value="0.025"/>
-    <param name="min_odom_rot_stddev" value="0.05"/>
+    <param name="min_odom_trans_stddev" value="0.02"/> <!-- 0.014 -->
+    <param name="min_odom_strafe_stddev" value="0.02"/>
+    <param name="min_odom_rot_stddev" value="0.04"/>
     <param name="odom_alpha1" value="0.04"/> <!-- 0.014 -->
     <param name="odom_alpha2" value="0.04"/>
     <param name="odom_alpha3" value="0.03"/>

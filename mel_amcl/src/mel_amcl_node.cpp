@@ -37,6 +37,7 @@
 #include "mel_amcl/sensors/mel_amcl_odom.h"
 #include "mel_amcl/sensors/mel_amcl_pose.h"
 #include "mel_amcl/sensors/mel_amcl_laser.h"
+#include "mel_amcl/sensors/mel_amcl_feature.h"
 #include "portable_utils.hpp"
 
 #include "ros/assert.h"
@@ -122,11 +123,12 @@ angle_diff(double a, double b)
 }
 
 static const std::string scan_topic_ = "scan";
+static const std::string feature_topic_ = "row_detector/poles";
 static const std::string gps_map_frame_topic_ = "gps/map_pose_yaw";
 // in case we have a datum relating to the map and use navsat_transform_node instead of gps_transform.py:
-static const std::string gps_odom_topic_ = "odometry/gps"; 
-static const std::string gps_raw_topic_ = "odometry/gps/unfiltered"; 
-static const std::string gps_raw_yaw_topic_ = "yaw"; 
+static const std::string gps_odom_topic_ = "odometry/gps";
+static const std::string gps_raw_topic_ = "odometry/gps/unfiltered";
+static const std::string gps_raw_yaw_topic_ = "yaw";
 
 
 /* This function is only useful to have the whole code work
@@ -188,6 +190,9 @@ private:
   void initialPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void handleInitialPoseMessage(const geometry_msgs::PoseWithCovarianceStamped &msg);
   void mapReceived(const nav_msgs::OccupancyGridConstPtr &msg);
+  void featureMapReceived(const nav_msgs::OccupancyGridConstPtr &msg);
+  void featurePoseReceived(const geometry_msgs::PoseArrayConstPtr &mag);
+  void handleFeaturePoseMessage(const geometry_msgs::PoseArray &msg);
   void gpsPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void gpsOdomReceived(const nav_msgs::Odometry odom_msg);
   void gpsRawReceived(const nav_msgs::OdometryConstPtr &msg);
@@ -198,8 +203,12 @@ private:
   void handleGPSPoseMessage(const geometry_msgs::PoseWithCovarianceStamped &msg);
 
   void handleMapMessage(const nav_msgs::OccupancyGrid &msg);
+  void handleFeatureMapMessage(const nav_msgs::OccupancyGrid& msg);
+
   void freeMapDependentMemory();
+  void freeFeatureMapDependentMemory();
   map_t *convertMap(const nav_msgs::OccupancyGrid &map_msg);
+  map_t *convertFeatureMap(const nav_msgs::OccupancyGrid &map_msg);
   void updatePoseFromServer();
   void applyInitialPose();
 
@@ -222,6 +231,12 @@ private:
 
   geometry_msgs::PoseWithCovarianceStamped last_published_pose;
 
+  // Feature mapping variables
+  std::string feature_map_name_;
+  bool use_feature_localisation;
+  geometry_msgs::PoseArray last_feature_msg_;
+  int feature_num_threshold_;
+
   // GPS related variables
   pf_vector_t last_received_gps_pose;
   pf_vector_t last_received_gps_std;
@@ -229,6 +244,7 @@ private:
   double last_received_gps_yaw_std = 0.1;
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
+
   bool use_gps_without_scan;
   bool use_gps;
   bool use_ekf_yaw;
@@ -256,6 +272,7 @@ private:
 
 
   map_t *map_;
+  map_t *feature_map_;
   char *mapdata;
   int sx, sy;
   double resolution;
@@ -263,6 +280,7 @@ private:
   message_filters::Subscriber<sensor_msgs::LaserScan> *laser_scan_sub_;
   tf2_ros::MessageFilter<sensor_msgs::LaserScan> *laser_scan_filter_;
   ros::Subscriber initial_pose_sub_;
+  ros::Subscriber feature_sub_;
   ros::Subscriber gps_pose_sub_;
   ros::Subscriber gps_odom_sub_;
   ros::Subscriber gps_error_sub_;
@@ -288,7 +306,8 @@ private:
   AMCLOdom *odom_;
   AMCLPose *pose_;
   AMCLLaser *laser_;
-
+  AMCLFeature *feature_;
+  AMCLFeatureData feature_data_;
   ros::Duration cloud_pub_interval;
   ros::Time last_cloud_pub_time;
 
@@ -318,6 +337,7 @@ private:
   ros::ServiceServer set_map_srv_;
   ros::Subscriber initial_pose_sub_old_;
   ros::Subscriber map_sub_;
+  ros::Subscriber feature_map_sub_;
 
   diagnostic_updater::Updater diagnosic_updater_;
   void standardDeviationDiagnostics(diagnostic_updater::DiagnosticStatusWrapper &diagnostic_status);
@@ -327,6 +347,7 @@ private:
 
   amcl_hyp_t *initial_pose_hyp_;
   bool first_map_received_;
+  bool feature_map_received_;
   bool first_reconfigure_call_;
 
   boost::recursive_mutex configuration_mutex_;
@@ -367,6 +388,7 @@ private:
 
   ros::Time last_laser_received_ts_;
   ros::Time last_gps_msg_received_ts_;
+  ros::Time last_feature_msg_received_ts_;
   ros::Duration laser_check_interval_;
   ros::Duration gps_check_interval_;
   void checkLaserReceived(const ros::TimerEvent& event);
@@ -426,6 +448,7 @@ AmclNode::AmclNode() :
         sent_first_transform_(false),
         latest_tf_valid_(false),
         map_(NULL),
+        feature_map_(NULL),
         pf_(NULL),
         resample_count_(0),
         odom_(NULL),
@@ -434,6 +457,7 @@ AmclNode::AmclNode() :
 	      private_nh_("~"),
         initial_pose_hyp_(NULL),
         first_map_received_(false),
+        feature_map_received_(false),
         first_reconfigure_call_(true)
 {
   boost::recursive_mutex::scoped_lock l(configuration_mutex_);
@@ -541,6 +565,9 @@ AmclNode::AmclNode() :
 
 
   // For GPS
+  private_nh_.param("use_feature_localisation", use_feature_localisation, true);
+  private_nh_.param("feature_num_threshold", feature_num_threshold_, 4);
+  private_nh_.param("feature_map_name", feature_map_name_, std::string("likelihood_field_poles"));
   private_nh_.param("use_gps", use_gps, true);
   private_nh_.param("use_ekf_yaw", use_ekf_yaw, true);
   private_nh_.param("use_raw_gps_errors", use_raw_gps_errors, true);
@@ -617,6 +644,13 @@ AmclNode::AmclNode() :
   } else {
     requestMap();
   }
+
+  if (use_feature_localisation)
+  {
+    feature_map_sub_ = nh_.subscribe(feature_map_name_, 1, &AmclNode::featureMapReceived, this );
+    ROS_INFO("Subscribed to feature map topic: %s.", feature_map_name_.c_str());
+  }
+
   m_force_update = false;
 
   dsrv_ = new dynamic_reconfigure::Server<mel_amcl::MEL_AMCLConfig>(ros::NodeHandle("~"));
@@ -629,7 +663,10 @@ AmclNode::AmclNode() :
                                        boost::bind(&AmclNode::checkLaserReceived, this, _1));
 
 
-
+  if (use_feature_localisation)
+  {
+    feature_sub_ = nh_.subscribe(feature_topic_, 1, &AmclNode::featurePoseReceived, this);
+  }
 
 
 
@@ -659,6 +696,22 @@ AmclNode::AmclNode() :
 
   diagnosic_updater_.setHardwareID("None");
   diagnosic_updater_.add("Standard deviation", this, &AmclNode::standardDeviationDiagnostics);
+}
+
+
+void AmclNode::featurePoseReceived(const geometry_msgs::PoseArrayConstPtr &msg)
+{
+  handleFeaturePoseMessage(*msg);
+}
+
+
+void AmclNode::handleFeaturePoseMessage(const geometry_msgs::PoseArray &msg)
+{
+  last_feature_msg_ = msg;
+  //feature_data_=;
+
+  last_feature_msg_received_ts_ = msg.header.stamp;
+
 }
 
 
@@ -752,6 +805,7 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   }
 
   // GPS parameters
+  use_feature_localisation = config.use_feature_localisation;
   use_gps = config.use_gps;
   use_ekf_yaw = config.use_ekf_yaw;
   use_raw_gps_errors = config.use_raw_gps_errors;
@@ -874,6 +928,10 @@ void AmclNode::reconfigureCB(MEL_AMCLConfig &config, uint32_t level)
   delete pose_;
   pose_ = new AMCLPose();
   ROS_ASSERT(pose_);
+  //Feature
+  delete feature_;
+  feature_ = new AMCLFeature(feature_map_);
+  ROS_ASSERT(feature_);
   // Laser
   delete laser_;
   laser_ = new AMCLLaser(max_beams_, map_);
@@ -1248,6 +1306,45 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
 
 }
 
+
+void
+AmclNode::featureMapReceived(const nav_msgs::OccupancyGridConstPtr& msg)
+{
+  if (!feature_map_received_)
+    handleFeatureMapMessage( *msg );
+
+  feature_map_received_ = true;
+}
+
+void
+AmclNode::handleFeatureMapMessage(const nav_msgs::OccupancyGrid& msg)
+{
+  boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
+
+  ROS_INFO("Received a %d X %d map @ %.3f m/pix\n",
+           msg.info.width,
+           msg.info.height,
+           msg.info.resolution);
+  
+  if(msg.header.frame_id != global_frame_id_)
+    ROS_WARN("Frame_id of feature map received:'%s' doesn't match global_frame_id:'%s'. This could cause issues with reading published topics",
+             msg.header.frame_id.c_str(),
+             global_frame_id_.c_str());
+
+  freeFeatureMapDependentMemory();
+
+  feature_map_ = convertFeatureMap(msg);
+
+
+  // Instantiate the sensor objects (in this case just for features)
+  //Feature
+  delete feature_;
+  feature_ = new AMCLFeature(feature_map_);
+  ROS_ASSERT(feature_);
+
+}
+
+
 void
 AmclNode::freeMapDependentMemory()
 {
@@ -1265,6 +1362,19 @@ AmclNode::freeMapDependentMemory()
   pose_ = NULL;
   delete laser_;
   laser_ = NULL;
+}
+
+void
+AmclNode::freeFeatureMapDependentMemory()
+{
+  if( feature_map_ != NULL ) {
+    map_free( feature_map_ );
+    feature_map_ = NULL;
+  }
+
+  delete feature_;
+  feature_ = NULL;
+
 }
 
 /**
@@ -1298,10 +1408,39 @@ AmclNode::convertMap( const nav_msgs::OccupancyGrid& map_msg )
   return map;
 }
 
+
+/**
+ * Convert an OccupancyGrid map message into the internal
+ * representation.  This allocates a map_t and returns it.
+ */
+map_t*
+AmclNode::convertFeatureMap( const nav_msgs::OccupancyGrid& map_msg )
+{
+  map_t* map = map_alloc();
+  ROS_ASSERT(map);
+
+  map->size_x = map_msg.info.width;
+  map->size_y = map_msg.info.height;
+  map->scale = map_msg.info.resolution;
+  map->origin_x = map_msg.info.origin.position.x + (map->size_x / 2) * map->scale;
+  map->origin_y = map_msg.info.origin.position.y + (map->size_y / 2) * map->scale;
+  // Convert to player format
+  map->cells = (map_cell_t*)malloc(sizeof(map_cell_t)*map->size_x*map->size_y);
+  ROS_ASSERT(map->cells);
+  for(int i=0;i<map->size_x * map->size_y;i++)
+  {
+    map->cells[i].occ_state = map_msg.data[i];
+  }
+
+  return map;
+}
+
+
 AmclNode::~AmclNode()
 {
   delete dsrv_;
   freeMapDependentMemory();
+  freeFeatureMapDependentMemory();
   delete laser_scan_filter_;
   delete laser_scan_sub_;
   // TODO: delete everything allocated in constructor
@@ -1437,6 +1576,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
   callback_consecutive_failures_ = 0;
   AMCLLaserData ldata; // move this declration here so it is in scope of my added code.
   AMCLPoseData pdata;
+  AMCLFeatureData fdata;
   std::string laser_scan_frame_id = stripSlash(laser_scan->header.frame_id);
   if( map_ == NULL ) {
     return;
@@ -1620,7 +1760,14 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       else
       {
         ROS_WARN("GPS data too old to fuse, skipped gps update.");
-      }  
+      }
+    }
+
+    ros::Duration d = ros::Time::now() - last_feature_msg_received_ts_;
+    if (use_feature_localisation && last_feature_msg_.poses.size() > feature_num_threshold_ && d < ros::Duration(0.2))
+    {
+      fdata=feature_data_;
+      feature_->UpdateSensor(pf_, (AMCLSensorData*)&fdata);
     }
 
     ldata.sensor = lasers_[laser_index];

@@ -93,7 +93,6 @@ bool AMCLLandmark::UpdateSensor(pf_t *pf, AMCLSensorData *data)
 
 double AMCLLandmark::LikelihoodFieldModel(AMCLLandmarkData *data, pf_sample_set_t* set)
 {
-  ROS_INFO("Computing likelihood");
   AMCLLandmark *self;
   int i, j;
   double z, pz;
@@ -182,7 +181,6 @@ double AMCLLandmark::LikelihoodFieldModel(AMCLLandmarkData *data, pf_sample_set_
       p += pz;
     }
     p/=data->landmark_count;
-    // ROS_INFO("Done Computing likelihood");
     sample->weight *= p;
     total_weight += sample->weight;
   }

@@ -38,24 +38,24 @@ namespace mel_amcl
 
 
 // Laser sensor data
-class AMCLFeatureData : public AMCLSensorData
+class AMCLLandmarkData : public AMCLSensorData
 {
   public:
-    AMCLFeatureData () {poses=NULL;};
-    virtual ~AMCLFeatureData() {delete [] poses;};
+    AMCLLandmarkData () {poses=NULL;};
+    virtual ~AMCLLandmarkData() {delete [] poses;};
   // Laser range data (range, bearing tuples)
-  public: int feature_count;
+  public: int landmark_count;
   public: double (*poses)[2];
 };
 
 
 // Laseretric sensor model
-class AMCLFeature : public AMCLSensor
+class AMCLLandmark : public AMCLSensor
 {
   // Default constructor
-  public: AMCLFeature(map_t* map);
+  public: AMCLLandmark(map_t* map);
 
-  public: virtual ~AMCLFeature();
+  public: virtual ~AMCLLandmark();
 
   public: void SetModelLikelihoodField(double z_hit,
                                        double z_rand,
@@ -71,14 +71,14 @@ class AMCLFeature : public AMCLSensor
 
 
   // Determine the probability for the given pose
-  private: static double LikelihoodFieldModel(AMCLFeatureData *data, 
+  private: static double LikelihoodFieldModel(AMCLLandmarkData *data, 
                                               pf_sample_set_t* set);
 
 
   // Current data timestamp
   private: double time;
 
-  // The feature map
+  // The landmark map
   private: map_t *map;
 
   // Laser offset relative to robot

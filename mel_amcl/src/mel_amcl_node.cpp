@@ -1305,7 +1305,8 @@ AmclNode::landmarkMapReceived(const nav_msgs::OccupancyGridConstPtr& msg)
 {
   if (!landmark_map_received_)
     handleLandmarkMapMessage( *msg );
-    landmark_map_received_ = true;
+
+  landmark_map_received_ = true;
 }
 
 void
@@ -1364,7 +1365,6 @@ AmclNode::freeLandmarkMapDependentMemory()
     landmark_map_ = NULL;
   }
 
-  delete landmark_;
   landmark_ = NULL;
 
 }

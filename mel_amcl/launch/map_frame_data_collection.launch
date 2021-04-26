@@ -6,6 +6,6 @@
 
   <!-- bagging data -->
   <node pkg="rosbag" type="record" name="rosbag_record_standard_data" respawn="true" output="screen" 
-  args="-o $(arg bag_folder)/$(arg bag_prefix) /tf_static /odometry/base_raw /twist_mux/cmd_vel /nmea/main_GGA /yaw /vel /gps/fix /scan /imu/data" />
+  args="-o $(arg bag_folder)/$(arg bag_prefix) /tf_static /odometry/base_raw /twist_mux/cmd_vel /nmea/main_GGA /yaw /vel /gps/fix /scan /scanner_front/scan /scanner_back/scan /imu/data" />
 
 </launch>

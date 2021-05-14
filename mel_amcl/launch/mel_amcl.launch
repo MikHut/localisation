@@ -10,6 +10,8 @@
 
   <arg name="use_landmarks" default="false" />
   <arg name="landmark_topic" default="/row_detector/pole_poses" />
+  <arg name="landmark_num_threshold" default="1" />
+  <arg name="landmark_only_threshold" default="7" />
 
   <arg name="use_omni" default="true" />
 
@@ -34,6 +36,8 @@
     <!-- Landmark parameters -->
     <param name="use_landmarks" value="$(arg use_landmarks)" />
     <remap from="landmarks" to="$(arg landmark_topic)"/>
+    <param name="landmark_num_threshold" value="$(arg landmark_num_threshold)"/>
+    <param name="landmark_only_threshold" value="$(arg landmark_only_threshold)"/>
 
     <!-- MEL parameters -->
     <param name="publish_mel_health_" value="true"/>

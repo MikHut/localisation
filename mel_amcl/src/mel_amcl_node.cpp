@@ -236,6 +236,7 @@ private:
   bool use_landmarks_;
   geometry_msgs::PoseArray last_landmark_msg_;
   int landmark_num_threshold_;
+  int landmark_only_threshold_;
 
   // GPS related variables
   pf_vector_t last_received_gps_pose;
@@ -245,7 +246,6 @@ private:
   geometry_msgs::PoseWithCovarianceStamped last_received_gps_msg;
   // variable which will allow the node to publish gps data if no laser data is received
 
-  bool use_gps_without_scan;
   bool use_gps;
   bool use_ekf_yaw;
   bool use_raw_gps_errors;
@@ -566,7 +566,8 @@ AmclNode::AmclNode() :
 
   // For GPS
   private_nh_.param("use_landmarks", use_landmarks_, true);
-  private_nh_.param("landmark_num_threshold", landmark_num_threshold_, 5);
+  private_nh_.param("landmark_num_threshold", landmark_num_threshold_, 1);
+  private_nh_.param("landmark_only_threshold", landmark_only_threshold_, 7);
   private_nh_.param("landmark_map_name", landmark_map_name_, std::string("likelihood_field_poles"));
   private_nh_.param("use_gps", use_gps, true);
   private_nh_.param("use_ekf_yaw", use_ekf_yaw, true);
@@ -1134,8 +1135,6 @@ AmclNode::checkLaserReceived(const ros::TimerEvent& event)
     ROS_WARN("No laser scan received (and thus no pose updates have been published) for %f seconds.  Verify that data is being published on the %s topic.",
              d.toSec(),
              ros::names::resolve(scan_topic_).c_str());
-
-    use_gps_without_scan = true;
   }
   else if (d > laser_check_interval_)
   {
@@ -1143,11 +1142,8 @@ AmclNode::checkLaserReceived(const ros::TimerEvent& event)
              d.toSec(),
              ros::names::resolve(scan_topic_).c_str());
 
-    use_gps_without_scan = true;  }
-  else
-  {
-    use_gps_without_scan = false;
   }
+
 }
 
 void AmclNode::checkGPSReceived(const ros::TimerEvent &event)
@@ -1155,7 +1151,7 @@ void AmclNode::checkGPSReceived(const ros::TimerEvent &event)
   ros::Duration d = ros::Time::now() - last_gps_msg_received_ts_;  
   if (d > gps_check_interval_)
   {
-    if (use_gps)
+    if (use_gps && !use_gps_odom)
     {
       ROS_WARN("No GPS data received for %f seconds.  Verify that gps data in the map frame is being published on the %s topic. Will use Lidar only if availlable.",
              d.toSec(),
@@ -1173,7 +1169,7 @@ void AmclNode::checkGPSReceived(const ros::TimerEvent &event)
   {
     gps_received = true;
   }
-  
+
 }
 
 void
@@ -1767,11 +1763,12 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       ROS_ASSERT(fdata.poses);
       for(int i=0;i<fdata.landmark_count;i++)
       {
-          fdata.poses[i][0] = landmark_data_.poses[i].position.x;
-          fdata.poses[i][1] = landmark_data_.poses[i].position.y;
+        fdata.poses[i][0] = landmark_data_.poses[i].position.x;
+        fdata.poses[i][1] = landmark_data_.poses[i].position.y;
       }
       landmark_->UpdateSensor(pf_, (AMCLSensorData*)&fdata);
-      landmark_only = true;
+      if (fdata.landmark_count > landmark_only_threshold_)
+        landmark_only = true;
     }
 
     ldata.sensor = lasers_[laser_index];
@@ -1824,7 +1821,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     // The AMCLLaserData destructor will free this memory
     ldata.ranges = new double[ldata.range_count][2];
     ROS_ASSERT(ldata.ranges);
-    
+
     if (filter_scan_by_range)
     {
       int j{0};
@@ -1861,19 +1858,11 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       }
     }
 
-    // if (!landmark_only)
-    // {
+    if (!landmark_only)
+    {
       lasers_[laser_index]->UpdateSensor(pf_, (AMCLSensorData*)&ldata);
-      // ROS_INFO("MAP LOCALISATION");
-    // }
-    // else
-    // {
-    //   ROS_INFO("LANDMARK ONLY LOCALISATION");
-    // }
+    }
     lasers_update_[laser_index] = false;
-
-
-
 
 
     pf_odom_pose_ = pose;

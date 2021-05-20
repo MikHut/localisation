@@ -1299,8 +1299,7 @@ AmclNode::handleMapMessage(const nav_msgs::OccupancyGrid& msg)
 void
 AmclNode::landmarkMapReceived(const nav_msgs::OccupancyGridConstPtr& msg)
 {
-  if (!landmark_map_received_)
-    handleLandmarkMapMessage( *msg );
+  handleLandmarkMapMessage( *msg );
 
   landmark_map_received_ = true;
 }
@@ -1308,7 +1307,7 @@ AmclNode::landmarkMapReceived(const nav_msgs::OccupancyGridConstPtr& msg)
 void
 AmclNode::handleLandmarkMapMessage(const nav_msgs::OccupancyGrid& msg)
 {
-  boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
+  // boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
 
   ROS_INFO("Received a %d X %d landmark map @ %.3f m/pix\n",
            msg.info.width,
@@ -1755,7 +1754,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
     landmark_data_ = last_landmark_msg_;
     fdata.landmark_count = landmark_data_.poses.size();
     bool landmark_only{false};
-    if (landmark_map_received_ && use_landmarks_ && fdata.landmark_count > landmark_num_threshold_ && d < ros::Duration(0.2))
+    if (use_landmarks_ && landmark_map_ != NULL && landmark_ !=NULL && fdata.landmark_count > landmark_num_threshold_ && d < ros::Duration(0.2))
     {
       ROS_INFO("Updating with %d landmarks.", fdata.landmark_count);
       fdata.poses = new double[fdata.landmark_count][2];

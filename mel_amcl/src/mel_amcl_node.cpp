@@ -1769,6 +1769,10 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       if (fdata.landmark_count > landmark_only_threshold_)
         landmark_only = true;
     }
+    else
+    {
+      ROS_WARN("Not enought landmarks (%d) or landmark data too old (%f secs).", fdata.landmark_count, d.toSec());
+    }
 
     ldata.sensor = lasers_[laser_index];
     ldata.range_count = laser_scan->ranges.size();

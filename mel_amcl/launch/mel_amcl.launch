@@ -89,17 +89,17 @@
     <param name="odom_model_type" value="diff-corrected" unless="$(arg use_omni)"/>
     <param name="min_odom_trans_stddev" value="0.02"/> <!-- 0.014 -->
     <param name="min_odom_strafe_stddev" value="0.02"/>
-    <param name="min_odom_rot_stddev" value="0.04"/>
-    <param name="odom_alpha1" value="0.04"/> <!-- 0.014 -->
-    <param name="odom_alpha2" value="0.04"/>
+    <param name="min_odom_rot_stddev" value="0.02"/>
+    <param name="odom_alpha1" value="0.03"/> <!-- 0.014 -->
+    <param name="odom_alpha2" value="0.03"/>
     <param name="odom_alpha3" value="0.03"/>
     <param name="odom_alpha4" value="0.03"/>
     <param name="odom_alpha5" value="0.03"/>
     <param name="odom_frame_id" value="odom"/>
     <param name="base_frame_id" value="base_link"/>
-    <param name="global_frame_id" value="map" />	 
-		<param name="laser_update_interval" value="2.0" />	 
-    <param name="timed_no_motion_updates" value="true" />	 
+    <param name="global_frame_id" value="map" />
+		<param name="laser_update_interval" value="2.0" />
+    <param name="timed_no_motion_updates" value="true" />
 
 	  <!-- map -->
     <param name="use_map_topic" value="true"/>

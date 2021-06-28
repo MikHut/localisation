@@ -1750,28 +1750,35 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
       }
     }
 
-    ros::Duration d = ros::Time::now() - last_landmark_msg_received_ts_;
+
     landmark_data_ = last_landmark_msg_;
     fdata.landmark_count = landmark_data_.poses.size();
     bool landmark_only{false};
-    if (use_landmarks_ && landmark_map_ != NULL && landmark_ !=NULL && fdata.landmark_count > landmark_num_threshold_ && d < ros::Duration(0.2))
+    ros::Duration d = ros::Time::now() - last_landmark_msg_received_ts_;
+    if (use_landmarks_)
     {
-      ROS_INFO("Updating with %d landmarks.", fdata.landmark_count);
-      fdata.poses = new double[fdata.landmark_count][2];
-      fdata.sensor = landmark_;
-      ROS_ASSERT(fdata.poses);
-      for(int i=0;i<fdata.landmark_count;i++)
+      if (landmark_map_ != NULL && landmark_ !=NULL && fdata.landmark_count > landmark_num_threshold_ && d < ros::Duration(0.2))
       {
-        fdata.poses[i][0] = landmark_data_.poses[i].position.x;
-        fdata.poses[i][1] = landmark_data_.poses[i].position.y;
+        ROS_INFO("Updating with %d landmarks.", fdata.landmark_count);
+        fdata.poses = new double[fdata.landmark_count][2];
+        fdata.sensor = landmark_;
+        ROS_ASSERT(fdata.poses);
+        for(int i=0;i<fdata.landmark_count;i++)
+        {
+          fdata.poses[i][0] = landmark_data_.poses[i].position.x;
+          fdata.poses[i][1] = landmark_data_.poses[i].position.y;
+        }
+        landmark_->UpdateSensor(pf_, (AMCLSensorData*)&fdata);
+        if (fdata.landmark_count > landmark_only_threshold_)
+          landmark_only = true;
       }
-      landmark_->UpdateSensor(pf_, (AMCLSensorData*)&fdata);
-      if (fdata.landmark_count > landmark_only_threshold_)
-        landmark_only = true;
-    }
-    else
-    {
-      ROS_WARN("Not enought landmarks (%d) or landmark data too old (%f secs).", fdata.landmark_count, d.toSec());
+      else
+      {
+        if (fdata.landmark_count <= landmark_num_threshold_)
+          ROS_WARN("Not enought landmarks (%d).", fdata.landmark_count);
+        else
+          ROS_WARN("Landmark data too old (%f secs).", d.toSec());
+      }
     }
 
     ldata.sensor = lasers_[laser_index];

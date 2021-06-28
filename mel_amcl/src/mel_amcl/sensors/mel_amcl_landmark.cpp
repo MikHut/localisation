@@ -122,7 +122,7 @@ double AMCLLandmark::LikelihoodFieldModel(AMCLLandmarkData *data, pf_sample_set_
 
     for (i = 0; i < data->landmark_count; i++)
     {
-      x_landmark = data->poses[i][0]; // this is in base_link - need to transform to map
+      x_landmark = data->poses[i][0]; // this is in base_link - need to transform to map, do same as laser
       y_landmark = data->poses[i][1];
 
       // This model ignores max range readings
@@ -163,21 +163,16 @@ double AMCLLandmark::LikelihoodFieldModel(AMCLLandmarkData *data, pf_sample_set_
 
       // pz += self->z_hit * z;
       pz += z;
-      // replaced with above since our published likelihood field does this
-      // keep the z_hit bit for now till I know for sure what that models - think its just prob of hit so nearly 1 usually - Michael Apr 2021
-      // pz += self->z_hit * exp(-(z * z) / z_hit_denom);
+
+
       // Part 2: random measurements
       // pz += self->z_rand * z_rand_mult;
 
-      // TODO: outlier rejection for short readings
+      // TODO: outlier rejection
 
       assert(pz <= 1.0);
       assert(pz >= 0.0);
 
-      //      p *= pz;
-      // here we have an ad-hoc weighting scheme for combining beam probs
-      // works well, though...
-      // p += pz*pz*pz;
       p += pz;
     }
     p/=data->landmark_count;

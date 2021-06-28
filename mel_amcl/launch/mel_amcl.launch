@@ -23,7 +23,7 @@
   <arg name="initial_cov_aa" default="0.0"/>
 
 
-  <node pkg="mel_amcl" type="mel_amcl" name="mel_amcl" output="screen">
+  <node pkg="mel_amcl" type="mel_amcl" name="mel_amcl" output="screen" respawn="true">
 
     <!-- GPS parameters -->
     <param name="use_gps" value="$(arg use_gps)"/>

@@ -48,7 +48,7 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
   double angle_error;
   double pose_cov;
   double yaw_cov;
-  double euclidean_distance_sqared;
+  double euclidean_distance_squared;
   double euclidean_p;
   double euclidean_denom;
   double yaw_denom;
@@ -96,9 +96,9 @@ double AMCLPose::GaussianModel(AMCLPoseData *data, pf_sample_set_t* set)
     pose = sample->pose;
 
 
-    euclidean_distance_sqared = pow(pose.v[0] - data->pose.v[0],2) + pow(pose.v[1] - data->pose.v[1],2);
+    euclidean_distance_squared = pow(pose.v[0] - data->pose.v[0],2) + pow(pose.v[1] - data->pose.v[1],2);
 
-    euclidean_p = exp(-0.5 * (euclidean_distance_sqared / pose_cov) ) / euclidean_denom;
+    euclidean_p = exp(-0.5 * (euclidean_distance_squared / pose_cov) ) / euclidean_denom;
     
 
     if (data->use_ekf_yaw)

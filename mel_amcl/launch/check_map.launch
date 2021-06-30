@@ -8,11 +8,17 @@
 
 
   <!-- Play rosbag -->
-  <arg name="path" default="/media/$(env USER)/DATA/map_frame/clockhouse/" />
-  <arg name="file_name" default="clockhouse_mid.bag" />
+  <arg name="path" default="/media/$(env USER)/DATA1/mapping_bags/hughlowe/" />
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-10-20-09.bag" /> -->
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-11-40-43.bag" /> -->
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-11-57-03.bag" /> -->
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-12-10-21.bag" /> -->
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-12-21-54.bag" /> -->
+  <!-- <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-12-21-54.bag" /> -->
+  <arg name="file_name" default="mapping_hughlowe_field_name_south_2021-02-11-14-00-53.bag" />
 
   <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg path)$(arg file_name)
-        -r 20 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan"/>
+        -r 8 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan /scanner_front/scan /scanner_back/scan"/>
   
 
   <!-- Load rtk map -->

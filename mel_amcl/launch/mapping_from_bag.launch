@@ -1,22 +1,25 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
+  <arg name="node_start_delay" default="2.0" />  
 
-  <arg name="site_name" default="clockhouse"/>
-  <arg name="datum_file" default="$(find mel_amcl)/config/datums/$(arg site_name).yaml"/>
+  <arg name="site_name" default="hughlowe"/>
+  <arg name="datum_file" default="$(find thorvald_uv_bringup)/config/site_files/clockhouse/shawfield/datum.yaml"/>
 
   <param name="/use_sim_time" value="true"/>
 
   <!-- Rosbag args -->
-  <arg name="path" default="/media/$(env USER)/DATA/map_frame/clockhouse/" />
-  <arg name="file_name" default="clockhouse_mid.bag" />
+  <arg name="path" default="/media/michael/DATA1/mapping_bags/clockhouse/shawfield/" />
+  <arg name="file_name" default="mapping_clockhouse_shawfield_2021-03-03-14-19-55.bag" />
 
 
   <!-- Play rosbag - if skipping some start time - play start of bag for tf_static -->
   <node pkg="rosbag" type="play" name="player1" output="screen" args="$(arg path)$(arg file_name)
         --rate=1 --duration=2 --keep-alive --topics /tf_static"/>
   <node pkg="rosbag" type="play" name="player2" output="screen" args="--clock $(arg path)$(arg file_name)
-        --rate=1 --start=1500 --duration=3600 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scan /nmea/main_GGA /imu/data"/>
-  
+        --rate=2 --start=410 --duration=3600 --topics /odometry/base_raw /tf_static /gps/fix /yaw /twist_mux/cmd_vel /scanner_front/scan scanner_back/scan /nmea/main_GGA /imu/data" >
+  </node>
+
+
 
   <!-- Mapping localisation -->
   <include file="$(find mel_amcl)/launch/mapping_localisation.launch">
@@ -33,8 +36,14 @@
         args="-d $(find rasberry_bringup)/resources/row_traversal_action.rviz"/>
 
   <!-- mapviz -->
-  <include file="$(find mel_amcl)/launch/mapviz.launch">
+  <!-- <include file="$(find mel_amcl)/launch/mapviz.launch">
     <arg name="datum_file" value="$(arg datum_file)" />
-  </include>
+  </include> -->
 
+    <!-- scan merger -->
+  <!-- <include file="$(find rasberry_bringup)/launch/corner_lasers_merger.launch" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' ">
+    <arg name="laserscan_topics" value="/scanner_front/scan scanner_back/scan" />
+  </include> -->
+
+  
 </launch>

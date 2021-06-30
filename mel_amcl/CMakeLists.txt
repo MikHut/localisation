@@ -94,6 +94,7 @@ add_library(mel_amcl_sensors
                     src/mel_amcl/sensors/mel_amcl_sensor.cpp
                     src/mel_amcl/sensors/mel_amcl_odom.cpp
                     src/mel_amcl/sensors/mel_amcl_laser.cpp
+                    src/mel_amcl/sensors/mel_amcl_landmark.cpp
                     src/mel_amcl/sensors/mel_amcl_pose.cpp
                     )
 target_link_libraries(mel_amcl_sensors mel_amcl_map mel_amcl_pf)
